@@ -7,11 +7,10 @@
 !(function($) {
   "use strict";
 
-  var stylesheets = ["assets/css/style1.css", "assets/css/style2.css"];
+  var stylesheets = ["assets/css/style1.css", "assets/css/style2.css", "assets/css/style3.css"];
   var rand = Math.floor(Math.random() * stylesheets.length);
-  
  
-  document.getElementById("stylesheet").setAttribute("href", stylesheets[rand]);
+  document.getElementById("theme").setAttribute("href", stylesheets[rand]);
   
   // Smooth scroll for the navigation menu and links with .scrollto classes
   var scrolltoOffset = $('#header').outerHeight() - 21;
