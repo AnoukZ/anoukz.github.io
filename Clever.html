@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<title>Clever HTML</title>
+	<meta  name="viewport" content="width=device-width, initial-scale=1.0">
+	<style type="text/css">
+		body    { color: white; background-color: black }
+		svg     { color: red;   background-color: transparent }
+		address { margin-top: 1em; padding-top: 1em; border-top: thin dotted }
+	</style>
+</head>
+
+
+<body>
+
+<!-- Define create and display image/canvas (png images must be in same directory as this html) -->
+<img    id="CleverImage1" width=   0 height=   0 src="Clever1.png" alt="Clever1.png missing">
+<img    id="CleverImage2" width=   0 height=   0 src="Clever2.png" alt="Clever2.png missing">
+<canvas id="myCanvas"     width=1020 height=1420 onclick="userInput(event)" tabindex=0 onkeypress="userKeyInput(event)">
+        Sorry, your browser does not support the HTML5 canvas tag.
+</canvas>
+
+<!---------------------------------------------------------->
+<!-- ToDo & Wishlist:                                     -->
+<!-- 1) run it on a mobile phone or tablet                -->
+<!-- 2) bonus actions for v2 "?" blue/green/pink          -->
+<!-- 3) undo bonus actions for pink if digit too low      -->
+<!--                                                      -->
+<!-- 6) scale to screen width/height                      -->
+<!-- 7) instruction for usage (not game rules)            -->
+<!-- 8) use of defines in code for improved readability   -->
+<!-- 9) review design to prepare for "Dobbel so Clever"   -->
+<!-- 0) additional code comments for design clarification -->
+<!---------------------------------------------------------->
+
+
+<script>
+<!-- Two Clever variants are available: 1 = Original, 2 = "Dobbel zo Clever" -->
+var boardVariant   = 1;
+var CleverImage    = "CleverImage" + boardVariant; <!-- Select image depending on the variant -->
+
+var boardWidth     = myCanvas.width;    <!-- original horizontal resolution of the background image -->
+var boardHeight    = myCanvas.height;   <!-- original vertical   resolution of the background image -->
+
+var fontLarge      = "italic bold 60px Comic Sans MS"; <!-- Font for digits (60px) and for socre (30px) -->
+var fontSmall      = "italic bold 30px Comic Sans MS"; <!-- Font for digits (60px) and for socre (30px) -->
+
+var boardSettingsRotate = 0; <!-- Board rotation (0: normal, 1: 90 degrees counterclockwise) -->
+var boardSettingsScale  = 0;
+
+var debugOn         = 0;       <!-- Activates all debug logging, 0: logging OFF, x: level 'x' logging ON (max 7) -->
+var debugLog        = "Info:"; <!-- Used for debug logging only -->
+
+
+<!-- Boards use index 0 to indicate where the next marker should be drawn -->
+<!-- The first few  boards are for game control and generic to all variants -->
+var boardRound      = [];
+var boardReTake     = []; <!-- Variant "Dobbel zo Clever" only -->
+var boardReRoll     = [];
+var boardPlusOne    = [];
+
+<!-- The below first set of colored boards are for "Clever Original" variant only -->
+var board1Yellow    = [];
+var board1Blue      = [];
+var board1Green     = [];
+var board1Orange    = [];
+var board1Purple    = [];
+
+<!-- The below second set of colored boards are for "Dobbel zo Clever" variant only -->
+var board2Silver    = [];
+var board2Yellow    = [];
+var board2Blue      = [];
+var board2Green     = [];
+var board2Pink      = [];
+
+<!-- boardBonus keeps track of whether or not a bonus action is already used/applied (0: unused, 1: used) -->
+var boardBonus      = [];
+
+<!-- List of accumulated manual bonus actions (couples: group/value), use index 0 to indicate where the next entry should be stored -->
+var bonusList       = []; <!-- Used to set/clear manual bonus action on yellow/blue/black "x" and black "6" -->
+
+<!-- In order to avoid accidental push of start, user must click start twice for game to restart -->
+var startCounter    = 0;
+
+<!-- List of historically choosen items (triplets: group/item/value), use index 0 to indicate where the next entry should be stored -->
+var historyList     = [ 1 ];
+var historyLastDigit;
+
+
+window.onload = function() {
+
+	if (debugOn >= 7)  <!-- log dimensions of board, window and screen size -->
+	{
+		debugLog += " boardW:"        + boardWidth        + ",H:" + boardHeight
+		debugLog += " window.innerW:" + window.innerWidth + ",H:" + window.innerHeight;
+		debugLog += " screen.availW:" + screen.availWidth + ",H:" + screen.availHeight; <!-- minus taskbar -->
+		debugLog += " screen.W:"      + screen.width      + ",H:" + screen.height;      <!-- full physical screen -->
+	}
+
+	initGlobals();
+	drawBoard();
+}
+
+
+function initGlobals () {
+	var i = 0;
+	
+	<!-- Boards use index 0 to indicate where the next marker should be drawn, values -1 and 9 indicate unused items -->
+	if (boardVariant == 1) 
+	{
+		boardRound   = [  1,  0, 0, 0, 0, 0, 0 ];
+		boardReRoll  = [  1,  0, 0, 0, 0, 0, 0, 0 ];
+		boardReTake  = [ 999 ];  <!-- Not used for this variant, "Dobbel zo Clever" only -->
+		boardPlusOne = [  1,  0, 0, 0, 0, 0, 0, 0 ];
+
+		board1Yellow = [  5,  0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0 ];
+		board1Blue   = [  2,  1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ];
+		board1Green  = [  1,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ];
+		board1Orange = [  1,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ];
+		board1Purple = [  1,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ];
+	}
+	else if (boardVariant == 2)
+	{
+		boardRound   = [  1,  0, 0, 0, 0, 0, 0 ];
+		boardReRoll  = [  1,  0, 0, 0, 0, 0, 0 ];
+		boardReTake  = [  1,  0, 0, 0, 0, 0, 0 ];
+		boardPlusOne = [  1,  0, 0, 0, 0, 0, 0 ];
+
+		board2Silver = [  1,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ];
+		board2Yellow = [ 11,  9, 0, 9, 0, 0, 9, 0, 9, 9, 0, 9, 0, 0, 9, 0, 9, 9, 0, 9, 0 ];
+		board2Blue   = [  1,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ];
+		board2Green  = [  1,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ];
+		board2Pink   = [  1,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ];
+	} else
+	{
+		debugLog += " initGlobals() error board variant " + boardVariant; document.getElementById("debuglog").innerHTML = debugLog;
+	}
+	
+	<!-- boardBonus keeps track of whether or not a bonus action is used (0: unused, 1: used) -->
+	boardBonus = []; <!-- Clear bonus list and then add a cleared (0) entry for each board bonus -->
+	for (i=0; i <= ((boardVariant == 2) ? 48 : 35) ; i++) { boardBonus[ boardBonus.length ] = 0 }
+	
+	<!-- List of accumulated manual bonus actions, indexed by group, use index 0 to summarize total nr of marked bonuses -->
+	<!-- Each board group has its own index 1-9, use index 10 for black "6" and 11 for black "X/6"               -->
+	bonusList    = [ 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ]; <!-- Used to set/clear manual bonus actions -->
+
+	<!-- In order to avoid accidental push of start, user must click start twice for game to restart -->
+	startCounter = 0;
+
+	if (debugOn >= 6) { debugLog += " initGlobals()"; document.getElementById("debuglog").innerHTML = debugLog; }
+}
+
+
+function drawBoard () {
+	var c = document.getElementById("myCanvas"); c.focus();
+	var ctx = myCanvas.getContext("2d");
+	var x = 0;
+	var y = 0;
+
+	if (debugOn >= 7) { debugLog += " drawBoard() myCanvas.Width:" + myCanvas.width + ",Height:" + myCanvas.height; }
+
+	CleverImage = "CleverImage" + boardVariant; <!-- Select image of the selected variant -->
+
+<!-- ToDo	ctx.scale( window.innerHeight/boardHeight, window.innerHeight/boardHeight ); <!-- 1,1 is full scale, neither increased nor reduced -->
+
+	ctx.save();
+	if (boardSettingsRotate == 0)
+	{
+		myCanvas.width  = boardWidth;
+		myCanvas.height = boardHeight;
+	} else
+	{
+		myCanvas.width  = boardHeight;
+		myCanvas.height = boardWidth;
+
+		ctx.rotate( -90 * Math.PI / 180);
+		x -= boardWidth;
+
+		if (debugOn >= 7) { debugLog += " myCanvas.Width:" + myCanvas.width + ",Height:" + myCanvas.height; }
+	}
+	ctx.drawImage( document.getElementById(CleverImage), x, y );
+	ctx.restore();
+
+	ctx.font      = fontLarge;
+	ctx.fillStyle = "red";
+	ctx.textAlign = "center";
+
+	if (debugOn >= 6) { document.getElementById("debuglog").innerHTML = debugLog; }
+}
+
+
+function addHistory ( group, index, value ) {
+	var i = historyList[0]; <!-- History list index 0 indicates where the next entry should be stored -->
+
+	<!-- Each history list entry is a triplet of group/index/value -->
+	historyList[i] = group; i++;
+	historyList[i] = index; i++;
+	historyList[i] = value; i++;
+	historyList[0] = i;
+
+	if (debugOn >= 6) { document.getElementById("debuglog6").innerHTML = "6) addHistory(G" + group + ",I" + index + ",V" + value + ") H" + historyList; }
+}
+
+
+function userHistory ( direction ) {
+	var historyIndex = historyList[0];
+	var i;
+
+	if (debugOn >= 6) { debugLog += " uH(" + direction + ") " + historyIndex + ":" + historyList.length; }
+
+	if (direction == 0) <!-- Restart (clear all and start over) -->
+	{
+		initGlobals(); drawBoard();
+		historyList = [ 1 ];
+	}
+	else if (historyIndex > 1 && direction < 0) <!-- Undo (backward) -->
+	{
+		initGlobals(); drawBoard();
+
+		for ( i = 1; i < historyIndex + direction * 3; i += 3 )
+		{
+			if (debugOn >= 6) { debugLog += " < " + historyList[i] + "," + historyList[i+1] + "," + historyList[i+2]; }
+			markItem( historyList[i], historyList[i+1], historyList[i+2], "user" );
+		}
+		historyList[0] = historyIndex + direction * 3;
+	}
+	else if ((historyIndex < historyList.length && direction > 0) || direction == 999) <!-- Redo (forward) -->
+	{
+		if (direction == 999) <!-- Hidden feature to toggle the rotation of the board -->
+		{ 
+			if (debugOn >= 6) { debugLog += " R" + boardSettingsRotate }
+			boardSettingsRotate = (boardSettingsRotate == 0) ? 1 : 0; 
+			initGlobals(); drawBoard();
+			historyIndex = 1;
+			if (debugOn >= 6) { debugLog += " R" + boardSettingsRotate }
+		}
+		
+		for ( i = historyIndex; i < historyIndex + direction * 3 && i < historyList.length; i += 3 )
+		{
+			if (debugOn >= 6) { debugLog += " > " + historyList[i] + "," + historyList[i+1] + "," + historyList[i+2]; }
+			markItem( historyList[i], historyList[i+1], historyList[i+2], "user" );
+		}
+		
+		if (direction != 999) { historyList[0] = historyIndex + direction * 3; }
+	}
+	
+	if (debugOn >= 1) { document.getElementById("debuglog").innerHTML = debugLog; }
+}
+
+
+function calcScore () {
+	var board;
+
+	var colorScoreTotal   = [ 0,  0,  0,  0,  0,  0 ];                             <!-- Total score per color, index 0 for bonus score -->
+
+	var colorScore1Yellow = [ 0, 10, 14, 16, 20 ];                                 <!-- Score table for columns of yellow marks        -->
+	var colorScore1Blue   = [ 0,  1,  2,  4,  7, 11, 16, 22, 29, 37, 46, 56 ];     <!-- Score table for number of blue marks           -->
+	var colorScore1Green  = [ 0,  1,  3,  6, 10, 15, 21, 28, 36, 45, 55, 66 ];     <!-- Score table for number of green marks          -->
+	var colorScore1Orange = [ 0,  1,  1,  1,  2,  1,  1,  2,  1,  2,  1,  3 ];     <!-- Multiplication factors for orange marks        -->
+
+	var colorScore2Silver = [ 0,  2,  4,  7, 11,  16,  22 ];                       <!-- Score table for number of marks per color      -->
+	var colorScore2Yellow = [ 0,  3, 10, 21, 36, 55, 75, 96,118,141,165 ];         <!-- Score table for number of yellow marks         -->
+	var colorScore2Blue   = [ 0,  1,  3,  6, 10, 15, 21, 28, 36, 45, 55, 66, 78 ]; <!-- Score table for number of blue marks           -->
+	var colorScore2Green  = [ 0,  2,  2,  2,  1,  3,  3,  3,  2,  3,  1,  4, 1 ];  <!-- Multiplication factors for green marks         -->
+
+	var colorCounter      = 0; <!-- Counts the number of marks of a particular color -->
+	var bonusCounter      = 0; <!-- Counts the number of special bonus red Swans     -->
+	var scoreTotal        = 0; <!-- Overall game score, adding all colors and bonus  -->
+	var i = 0;
+	var j = 0;
+	
+	if (boardVariant == 1) <!-- Clever Original -->
+	{
+		board = board1Yellow; colorScoreTotal[1] = 0;
+		if (board[ 1] > 0 && board[ 5] > 0 && board[ 9] > 0) { colorScoreTotal[1] += colorScore1Yellow[1] } <!-- 1st column -->
+		if (board[ 2] > 0 && board[ 6] > 0 && board[14] > 0) { colorScoreTotal[1] += colorScore1Yellow[2] } <!-- 2nd column -->
+		if (board[ 3] > 0 && board[11] > 0 && board[15] > 0) { colorScoreTotal[1] += colorScore1Yellow[3] } <!-- 3rd column -->
+		if (board[ 8] > 0 && board[12] > 0 && board[16] > 0) { colorScoreTotal[1] += colorScore1Yellow[4] } <!-- 4th column -->
+
+		board = board1Blue  ; colorScoreTotal[2] = 0; colorCounter = 0;
+		for (i=2; i < board.length; i++) { if (board[i] > 0) { colorCounter++ } }
+		colorScoreTotal[2] = colorScore1Blue[colorCounter];
+
+		board = board1Green ; colorScoreTotal[3] = 0; colorCounter = 0;
+		for (i=1; i < board.length; i++) { if (board[i] > 0) { colorCounter++ } }
+		colorScoreTotal[3] = colorScore1Green[colorCounter];
+
+		board = board1Orange; colorScoreTotal[4] = 0;
+		for (i=1; i < board.length; i++) { colorScoreTotal[4] += board[i] * colorScore1Orange[i] }
+
+		board = board1Purple; colorScoreTotal[5] = 0;
+		for (i=1; i < board.length; i++) { colorScoreTotal[5] += board[i] }
+
+		bonusCounter = boardBonus[8] + boardBonus[12] + boardBonus[19] + boardBonus[25] + boardBonus[31]; <!-- Locations of all the bonus red Swans -->
+		colorScoreTotal[0] = bonusCounter * Math.min( colorScoreTotal[1], colorScoreTotal[2], colorScoreTotal[3], colorScoreTotal[4], colorScoreTotal[5] );
+	}
+	else if (boardVariant == 2) <!-- Dobbel zo Clever -->
+	{
+		board = board2Silver; colorScoreTotal[1] = 0; 
+		for (i=0; i<=3; i++)
+		{
+			colorCounter = 0;
+			for (j=1; j<=6; j++) { if (board[i*6+j] > 0) { colorCounter++ } }
+			colorScoreTotal[1] += colorScore2Silver[colorCounter];
+		}
+
+		board = board2Yellow; colorScoreTotal[2] = 0; colorCounter = 0;
+		for (i=1; i < board.length; i++) { if (board[i] == 2) { colorCounter++ } }
+		colorScoreTotal[2] = colorScore2Yellow[colorCounter];
+
+		board = board2Blue ; colorScoreTotal[3] = 0; colorCounter = 0;
+		for (i=1; i < board.length; i++) { if (board[i] > 0) { colorCounter++ } }
+		colorScoreTotal[3] = colorScore2Blue[colorCounter];
+
+		board = board2Green; colorScoreTotal[4] = 0;
+		for (i=1; i < board.length; i+=2)
+		{
+			if (board[i+1] > 0) { colorScoreTotal[4] += (board[i] * colorScore2Green[i]) - (board[i+1] * colorScore2Green[i+1]) }
+		}
+
+		board = board2Pink; colorScoreTotal[5] = 0;
+		for (i=1; i < board.length; i++) { colorScoreTotal[5] += board[i] }
+
+		bonusCounter = boardBonus[5] + boardBonus[10] + boardBonus[22] + boardBonus[28] + boardBonus[34] + boardBonus[44]; <!-- Locations of all the bonus red Swans -->
+		colorScoreTotal[0] = bonusCounter * Math.min( colorScoreTotal[1], colorScoreTotal[2], colorScoreTotal[3], colorScoreTotal[4], colorScoreTotal[5] );
+	}
+	else if (boardVariant == 3) <!-- Clever tot de 3e Macht -->
+	{
+		<!-- Reserved for future expansion -->
+	}
+	else if (boardVariant == 4) <!-- Clever 4Ever -->
+	{
+		<!-- Reserved for future expansion -->
+	}
+
+	scoreTotal = 0;
+    for (i=0; i<colorScoreTotal.length; i++) { scoreTotal += colorScoreTotal[i] } <!-- Add scores for each individual color, including the bonus (at index 0) -->
+
+	if (debugOn >= 5) { document.getElementById("debuglog5").innerHTML = "5) calcScore() " + colorScoreTotal + " Swans " + bonusCounter + " TotalScore " + scoreTotal }
+
+	return scoreTotal;
+}
+
+
+function markBonus ( group, value ) {
+	var ctx = myCanvas.getContext("2d");
+	var txt = "BONUS";
+	var x = (group == 5) ? 213 : ((group == 6) ? boardWidth-213 : boardWidth/2);
+	var y = (group == 5 || group == 6) ? 401 : 932;
+	
+	if (debugOn >= 4) { document.getElementById("debuglog4").innerHTML = "4) markBonus(G" + group + ",V" + value + ") " + bonusList; }
+
+	if (group > 0)
+	{
+		if (boardSettingsRotate != 0) { x -= boardWidth }
+
+		if (value == 0 && bonusList[group] > 0) <!-- Clear bonus action indicator and remove action message, if group bonus list empty -->
+		{
+			bonusList[group]--; bonusList[0]--;
+			
+			if (bonusList[group] == 0)
+			{
+				var xx = x; if (boardSettingsRotate != 0) { xx += boardWidth } <!-- HTML bug? Needs separate var -->
+				ctx.drawImage( document.getElementById(CleverImage), xx-100, y, 2*100, 31, x-100, y, 2*100, 31 );
+			}
+		}
+		if (value > 0 || bonusList[group] > 0) <!-- Set bonus action indicator for specified group and display manual bonus action message -->
+		{
+			if (value > 0) { bonusList[group]++; bonusList[0]++ }
+
+			if (boardVariant == 1) { ctx.fillStyle = (group == 5) ? "#FFD966" : ((group == 6) ? "#2E75B6" : "black") }
+			if (boardVariant == 2) { ctx.fillStyle = (group == 5) ? "#A6A6A6" : ((group == 6) ? "#FFD966" : "black") }
+			ctx.fillRect(x-100, y, 2*100, 31);
+			ctx.lineWidth = 2;
+			ctx.strokeStyle = "white";
+			ctx.strokeRect(x-100+1, y+1, 2*100-2, 31-2);
+
+			if (group <=  9) { txt = bonusList[group] + "x " + "BONUS" } 
+			if (group == 10) { txt += " " + value }
+			if (group == 11) { txt += " X/6" }
+
+			if (boardVariant == 1) { ctx.fillStyle = (group == 5) ? "black"   : ((group == 6) ? "white"   : "white") }
+			if (boardVariant == 2) { ctx.fillStyle = (group == 5) ? "white"   : ((group == 6) ? "black"   : "white") }
+			ctx.font = fontSmall; ctx.fillText(txt, x, y+27); ctx.font = fontLarge;
+		}
+	}
+	if (debugOn >= 4) { document.getElementById("debuglog4").innerHTML += " > " + bonusList  }
+}
+
+
+function addItem ( group, value, optout ) {
+	var board;
+	var i;
+
+	optout = (typeof optout === "undefined") ? "bonus" : "undo";
+
+	if (debugOn >= 3) { document.getElementById("debuglog3").innerHTML = "3) addItem(G" + group + ",V" + value + ",O" + optout + ")"; }
+
+	switch (group) {
+		case 1: <!-- Round   -->
+			board = boardRound;
+			if (board[0] < board.length) { i = board[0]; markItem( group, i, 0, "bonus" ) }
+		break;
+		case 2: <!-- ReRoll  -->
+			board = boardReRoll;
+			if (board[0] < board.length) { i = board[0]; markItem( group, i, 0, "bonus" ) }
+		break;
+		case 3: <!-- ReTake  -->
+			board = boardReTake;
+			if (board[0] < board.length) { i = board[0]; markItem( group, i, 0, "bonus" ) }
+		break;
+		case 4: <!-- PlusOne -->
+			board = boardPlusOne;
+			if (board[0] < board.length) { i = board[0]; markItem( group, i, 0, "bonus" ) }
+		break;
+		case 5: <!-- v1 Yellow | v2 Silver | v3 Yellow -->
+			markBonus( group, value ); 
+		break;
+		case 6: <!-- v1 Blue   | v2 Yellow | v3 Aqua   -->
+			markBonus( group, value ); 
+		break;
+		case 7: <!-- v1 Green  | v2 Blue   | v3 Purple -->
+			board = (boardVariant == 2) ? board2Blue : board1Green;
+			if (board[0] < board.length) { i = board[0]; markItem( group, i, value, "bonus" ) }
+		break;
+		case 8: <!-- v1 Orange | v2 Green  | v3 Brown  -->
+			board = (boardVariant == 2) ? board2Green : board1Orange;
+			if (board[0] < board.length) { i = board[0]; markItem( group, i, value, "bonus" ) }
+		break;
+		case 9: <!-- v1 Purple | v2 Pink   | v3 Pink   -->
+			board = (boardVariant == 2) ? board2Pink : board1Purple;
+			<!-- ToDo: remove bonus if optout parameter is provided as "undo" -->
+			if (board[0] < board.length) { i = board[0]; markItem( group, i, value, "bonus" ) }
+		break;
+		case 10: <!-- Black "6" -->
+		case 11: <!-- Black "x" -->
+			<!-- Indicate that user may add an extra "6" or mark for a specified color group -->
+			markBonus( group, value ); 
+		break;
+		default:
+			debugLog += " addItem(G" + group + ") error";
+			if (debugOn >= 1) { document.getElementById("debuglog").innerHTML = debugLog; }
+		break;
+	}
+}
+
+
+function markItem( group, index, value, source ) {
+	var ctx = myCanvas.getContext("2d");
+	var board = boardRound;
+	var marker = "none";
+	var x  = 0;
+	var y  = 0;
+	var i  = index;
+	var xD = 0; <!-- x delta  -->
+	var yD = 0;
+	var xO = 0; <!-- x offset -->
+	var yO = 0;
+
+	<!-- If a manual bonus action is required, then only that particular group is accepted -->
+<!--	if ( source != "user" || bonusList[0] == 0 || bonusList[group] > 0 ||
+<!--	    (bonusList[ 9] > 0 && group >= 7 && group <=8) ||
+<!--	    (bonusList[10] > 0 && group >= 4 && group <=8))
+	{
+		if (source == "user" && (bonusList[10] > 0 || bonusList[11] > 0)) { value = 6 } <!-- Black bonus has value 6 -->
+		
+		<!-- The main determination of a valid group/item/value selection -->
+		switch (group) {
+			case 1: <!-- Round -->
+				board = boardRound;
+				i = board[0];
+				x = 50+(i*150); y = 67;
+				if (i >= 1 && i <= 6 && i < board.length) { <!-- Add check mark to specified item, only if empty and next in turn -->
+					if (board[i] == 0 && board[i-1] > 0) { marker = "check"; board[i] = 1; board[0]++ }
+				}
+			break;
+			case 2: <!-- ReRoll -->
+				board = boardReRoll;
+				xO = (boardVariant == 2) ? 200-22 : 200; xD = (boardVariant == 2) ? 126 : 104.5; x = xO+(i*xD);
+				y  = (boardVariant == 2) ? 198-27 : 198;
+				if (i >= 1 && i < board.length) { <!-- Add circle mark to next available empty item -->
+					if (board[i] == 0 && i == board[0]) { marker = "circle"; board[i] = 1; board[0]++ }
+				} else if (i == 0) {                        <!-- Add check mark to next available marked circle -->
+					for ( i = 1 ; i < board.length && marker != "used"; i++ ) {
+						if (board[i] == 1) { marker = "used"; board[i] = 2;	x = xO+(i*xD)+16; y -= 4 }
+					}
+				}
+			break;
+			case 3: <!-- ReTake  -->
+				board = boardReTake;
+				x = 200+(i*104.5); y = 267;
+				xO = (boardVariant == 2) ? 200-22 : 200; xD = (boardVariant == 2) ? 126 : 104.5; x = xO+(i*xD);
+				y  = (boardVariant == 2) ? 264+3 : 264;
+				if (i >= 1 && i < board.length) { <!-- Add circle mark to next available empty item -->
+					if (board[i] == 0 && i == board[0]) { marker = "circle"; board[i] = 1; board[0]++ }
+				} else if (i == 0) {                        <!-- Add check mark to next available marked circle -->
+					for ( i = 1 ; i < board.length && marker != "used"; i++ ) {
+						if (board[i] == 1) { marker = "used"; board[i] = 2;	x = xO+(i*xD)+16; y -= 4 }
+					}
+				}
+			break;
+			case 4: <!-- PlusOne -->
+				board = boardPlusOne;
+				xO = (boardVariant == 2) ? 200-22 : 200; xD = (boardVariant == 2) ? 126 : 104.5; x = xO+(i*xD);
+				y  = (boardVariant == 2) ? 330+35 : 330;
+				if (i >= 1 && i < board.length) { <!-- Add circle mark to next available empty item -->
+					if (board[i] == 0 && i == board[0]) { marker = "circle"; board[i] = 1; board[0]++ }
+				} else if (i == 0) {                        <!-- Add check mark to next available marked circle -->
+					for ( i = 1 ; i < board.length && marker != "used"; i++ ) {
+						if (board[i] == 1) { marker = "used"; board[i] = 2;	x = xO+(i*xD)+16; y -= 4 }
+					}
+				}
+			break;
+			case 5: <!-- v1 Yellow | v2 Silver -->
+				if (boardVariant == 1)
+				{
+					board = board1Yellow;
+					x = ((((i-1)%4)+1)*87)-7; y = 443+((Math.floor((i-1)/4)+1)*88);
+				} else if (boardVariant == 2)
+				{
+					board = board2Silver;
+					x = ((((i-1)%6)+1)*79)-15; y = 490+((Math.floor((i-1)/6)+1)*87);
+				}
+				if (board[0] >= board.length) { <!-- Color is already complete, mark as full to clear bonus action -->
+					marker = "full";
+				} else if (i >= 1 && i < board.length) { <!-- Add check mark to specified item, only if empty -->
+					if (board[i] == 0) { marker = "check" ; board[i] = 1; board[0]++ }
+				}
+			break;
+			case 6: <!-- v1 Blue   | v2 Yellow -->
+				board = (boardVariant == 2) ? board2Yellow : board1Blue;
+				if (boardVariant == 1)
+				{
+					x = ((((i-1)%4)+1)*87)-7+520; y = 443+88+((Math.floor((i-1)/4)+1)*88);
+					if (board[0] >= board.length) { <!-- Color is already complete, mark as full to clear bonus action -->
+						marker = "full";
+					} else if (i >= 2 && i <= 12 && i < board.length) { <!-- Add check mark to specified item, only if empty -->
+						if (board[i] == 0) { marker = "check" ; board[i] = 1; board[0]++ }
+					}
+				} else if (boardVariant == 2)
+				{
+					x = ((((i-1)%4)+1)*87)-7+520; y = 443+132+((Math.floor((i-1)/4)+1)*44);
+					if (i >= 1 && i < board.length) {
+						if (board[i] == 0) { marker = "circle"; board[i] = 1; x += 4; y -= 18 } <!-- Add circle mark to specified item -->
+						else if (board[i] == 1) { marker = "check" ; board[i] = 2 } <!-- Add check mark to item, only if circled -->
+					}
+				}
+			break;  
+			case 7: <!-- v1 Green  | v2 Blue   -->
+				board = (boardVariant == 2) ? board2Blue : board1Green;
+				xO = 30; xD = (boardVariant == 2) ? 84-8 : 84; x = xO+(i*xD)+5; y = 1063;
+				if (boardVariant == 1)
+				{
+					if (i >= 1 && i < board.length) {    <!-- Add check mark to specified item, only if empty -->
+						if (board[i] == 0) { marker = "check" ; board[i] = i; board[0]++ }
+					} else if (i == 0 && board[0] < board.length) { <!-- Add check mark to next available empty item -->
+						i = board[0];
+						if (board[i] == 0) { marker = "check"; board[i] = 1; board[0]++; x = xO+(i*xD)+5 }
+					}
+				} else if (boardVariant == 2)
+				{
+					if (source == "bonus") {             <!-- In case of bonus use 12 or previous value as highest possible -->
+						if (i > 1) { value = board[i-1] } else { value = 12 }
+					}
+					if (i >= 1 && i < board.length) {
+						if (board[i] == 0 && i == board[0])         <!-- Add specified digit to specified item, only if empty and next in line -->
+						{
+							marker = "digit" ; board[i] = value; board[0]++;
+						} else if (board[i] > 0 && i == board[0]-1) <!-- Change digit (cycle 1 thru 6), only for last marked item -->
+						{
+							if (i == 1) { value = (board[i] >= 12)         ? 2 : board[i]+1 }
+							else        { value = (board[i] >= board[i-1]) ? 2 : board[i]+1 }
+							marker = "digit+"; board[i] = value;
+						}
+					} else if (i == 0 && board[0] < board.length) { <!-- Add specified digit to next available empty item -->
+						i = board[0];
+						if (board[i] == 0) { marker = "digit"; board[i] = value; board[0]++; x = xO+(i*xD)+5 }
+					}
+				}
+			break; 
+			case 8: <!-- v1 Orange | v2 Green  -->
+				board = (boardVariant == 2) ? board2Green : board1Orange;
+				xO = (boardVariant == 2) ? 30+5 : 30; xD = (boardVariant == 2) ? 84-8 : 84; x = xO+(i*xD); y = 1220;
+				if (i >= 1 && i < board.length) {
+					if (board[i] == 0 && i == board[0])         <!-- Add specified digit to specified item, only if empty and next in line -->
+					{
+						marker = "digit" ; board[i] = value; board[0]++;
+					} else if (board[i] > 0 && i == board[0]-1) <!-- Change digit (cycle 1 thru 6), only for last marked item -->
+					{
+						value = (board[i] >= 6) ? 1 : board[i]+1;
+						marker = "digit+"; board[i] = value;
+					}
+				} else if (i == 0 && board[0] < board.length)   <!-- Add specified digit to next available empty item -->
+				{
+					i = board[0];
+					if (board[i] == 0) { marker = "digit"; board[i] = value; board[0]++; x = xO+(i*xD) }
+				}
+			break;  
+			case 9: <!-- v1 Purple | v2 Pink   -->
+				board = (boardVariant == 2) ? board2Pink : board1Purple;
+				xO = (boardVariant == 2) ? 30+5 : 30; xD = (boardVariant == 2) ? 84-8 : 84; x = xO+(i*xD); y = 1364;
+				if (i >= 1 && i < board.length) {
+					if (board[i] == 0 && i == board[0])         <!-- Add specified digit to specified item, only if empty and next in line -->
+					{
+						marker = "digit" ; board[i] = value; board[0]++;
+					} else if (board[i] > 0 && i == board[0]-1) <!-- Change digit (cycle 1 thru 6), only for last marked item -->
+					{
+						if (boardVariant == 1)
+						{
+							if (i <= 1)               { value = (board[i] >= 6) ?            1 : board[i]+1 }
+							else if (board[i-1] == 6) { value = (board[i] >= 6) ?            1 : board[i]+1 }
+							else                      { value = (board[i] >= 6) ? board[i-1]+1 : board[i]+1 }
+						} else if (boardVariant == 2) { value = (board[i] >= 6) ?            1 : board[i]+1 }
+						marker = "digit+"; board[i] = value;
+					}
+				} else if (i == 0 && board[0] < board.length) { <!-- Add specified digit to next available empty item -->
+					i = board[0];
+					if (board[i] == 0) { marker = "digit"; board[i] = value; board[0]++; x = xO+(i*xD) }
+				}
+			break;
+			default:
+				debugLog += " markItem(G" + group + ") error";
+				if (debugOn >= 1) { document.getElementById("debuglog").innerHTML = debugLog; }
+			break;
+		}
+	}
+
+	if (debugOn >= 2) { document.getElementById("debuglog2").innerHTML = "2) markItem(G" + group + ",I" + index + ",V" + value + "," + source + ") " + marker + " " + board; }
+
+	<!-- Display one of the marker types (check/circle/used/digit) -->
+	if (boardSettingsRotate != 0) { x -= boardWidth }
+	if (marker == "circle") {
+		ctx.beginPath(); ctx.arc(x,y,30,0,2*Math.PI); ctx.strokeStyle = "red"; ctx.lineWidth = 12; ctx.stroke();
+	} else if (marker == "check" || marker == "used") {
+		if (marker == "used") { x -= 20; y+=25 }
+		ctx.fillStyle = "red";   ctx.fillText("X", x, y);
+	} else if (marker == "digit" || marker == "digit+") {
+		var xx = x; if (boardSettingsRotate != 0) { xx += boardWidth } <!-- HTML bug? Needs separate var -->
+		ctx.drawImage( document.getElementById(CleverImage), xx-25, y-48, 65, 50, x-25, y-48, 65, 50 );
+		ctx.fillStyle = "red";   if (value <= 9) { ctx.fillText(value, x+5, y) } else { ctx.fillText("1", x-10, y); ctx.fillText(value-10, x+15, y) }
+	} else if (marker == "full" ) {
+		<!-- No action, only added to clear bonus action, which is done if any mark is placed -->
+	}
+
+	 <!-- If user has added a mark, then clear bonus action message -->
+	if (marker != "none" && marker != "digit+")
+	{
+		if (source == "user" && bonusList[10] > 0 && group >= 8) { group = 10 }
+		if (source == "user" && bonusList[11] > 0 && group >= 5) { group = 11 }
+		
+		markBonus( group, 0 ); <!-- Clear bonus for this group -->
+	}
+
+	<!-- Determine if a bonus action is unlocked (and not yet used), apply bonus if applicable -->
+	if (boardVariant == 1)
+	{
+		if (group == 1) { <!-- Round -->
+			if (boardBonus[ 1] == 0 && board[ 1] > 0) { boardBonus[ 1] = 1; addItem(  2, 1 ) } <!-- ReRoll        -->
+			if (boardBonus[ 2] == 0 && board[ 2] > 0) { boardBonus[ 2] = 1; addItem(  4, 1 ) } <!-- PlusOne       -->
+			if (boardBonus[ 3] == 0 && board[ 3] > 0) { boardBonus[ 3] = 1; addItem(  2, 1 ) } <!-- ReRoll        -->
+			if (boardBonus[ 4] == 0 && board[ 4] > 0) { boardBonus[ 4] = 1; addItem( 11, 9 ) } <!-- Black "x"/"6" -->
+		} else if (group == 5) { <!-- Yellow -->
+			if (boardBonus[ 5] == 0 && board[ 1] > 0 && board[ 2] > 0 && board[ 3] > 0 )                 { boardBonus[ 5] = 1; addItem( 6, 1 ) } <!-- Blue "x"   -->
+			if (boardBonus[ 6] == 0 && board[ 5] > 0 && board[ 6] > 0 && board[ 8] > 0 )                 { boardBonus[ 6] = 1; addItem( 8, 4 ) } <!-- Orange "4" -->
+			if (boardBonus[ 7] == 0 && board[ 9] > 0 && board[11] > 0 && board[12] > 0 )                 { boardBonus[ 7] = 1; addItem( 7, 1 ) } <!-- Green "x"  -->
+			if (boardBonus[ 8] == 0 && board[14] > 0 && board[15] > 0 && board[16] > 0 )                 { boardBonus[ 8] = 1;                 } <!-- Red Swan   -->
+			if (boardBonus[ 9] == 0 && board[ 1] > 0 && board[ 6] > 0 && board[11] > 0 && board[16] > 0) { boardBonus[ 9] = 1; addItem( 4, 1 ) } <!-- PlusOne    -->
+		} else if (group == 6) { <!-- Blue -->
+			if (boardBonus[10] == 0 && board[ 2] > 0 && board[ 3] > 0 && board[ 4] > 0                 ) { boardBonus[10] = 1; addItem( 8, 5 ) } <!-- Orange "5" -->
+			if (boardBonus[11] == 0 && board[ 5] > 0 && board[ 6] > 0 && board[ 7] > 0 && board[ 8] > 0) { boardBonus[11] = 1; addItem( 5, 1 ) } <!-- Yellow "x" -->
+			if (boardBonus[12] == 0 && board[ 9] > 0 && board[10] > 0 && board[11] > 0 && board[12] > 0) { boardBonus[12] = 1;                 } <!-- Red Swan   -->
+			if (boardBonus[13] == 0 && board[ 5] > 0 && board[ 9] > 0                                  ) { boardBonus[13] = 1; addItem( 2, 1 ) } <!-- ReRoll     -->
+			if (boardBonus[14] == 0 && board[ 2] > 0 && board[ 6] > 0 && board[10] > 0                 ) { boardBonus[14] = 1; addItem( 7, 1 ) } <!-- Green "x"  -->
+			if (boardBonus[15] == 0 && board[ 3] > 0 && board[ 7] > 0 && board[11] > 0                 ) { boardBonus[15] = 1; addItem( 9, 6 ) } <!-- Purple "6" -->
+			if (boardBonus[16] == 0 && board[ 4] > 0 && board[ 8] > 0 && board[12] > 0                 ) { boardBonus[16] = 1; addItem( 4, 1 ) } <!-- PlusOne    -->
+		} else if (group == 7) { <!-- Green -->
+			if (boardBonus[17] == 0 && board[ 4] > 0) { boardBonus[17] = 1; addItem(  4, 1 ) } <!-- PlusOne    -->
+			if (boardBonus[18] == 0 && board[ 6] > 0) { boardBonus[18] = 1; addItem(  6, 1 ) } <!-- Blue "x"   -->
+			if (boardBonus[19] == 0 && board[ 7] > 0) { boardBonus[19] = 1;                  } <!-- Red Swan   -->
+			if (boardBonus[20] == 0 && board[ 9] > 0) { boardBonus[20] = 1; addItem(  9, 6 ) } <!-- Purple "6" -->
+			if (boardBonus[21] == 0 && board[10] > 0) { boardBonus[21] = 1; addItem(  2, 1 ) } <!-- ReRoll     -->
+		} else if (group == 8) { <!-- Orange -->
+			if (boardBonus[22] == 0 && board[ 3] > 0) { boardBonus[22] = 1; addItem(  2, 1 ) } <!-- ReRoll     -->
+			if (boardBonus[23] == 0 && board[ 5] > 0) { boardBonus[23] = 1; addItem(  5, 1 ) } <!-- Yellow "x" -->
+			if (boardBonus[24] == 0 && board[ 6] > 0) { boardBonus[24] = 1; addItem(  4, 1 ) } <!-- PlusOne    -->
+			if (boardBonus[25] == 0 && board[ 8] > 0) { boardBonus[25] = 1;                  } <!-- Red Swan   -->
+			if (boardBonus[26] == 0 && board[10] > 0) { boardBonus[26] = 1; addItem( 10, 6 ) } <!-- Black "6"  --> 
+		} else if (group == 9) { <!-- Purple -->
+			if (boardBonus[27] == 0 && board[ 3] > 0) { boardBonus[27] = 1; addItem(  2, 1 ) } <!-- ReRoll     -->
+			if (boardBonus[28] == 0 && board[ 4] > 0) { boardBonus[28] = 1; addItem(  6, 1 ) } <!-- Blue "x"   -->
+			if (boardBonus[29] == 0 && board[ 5] > 0) { boardBonus[29] = 1; addItem(  4, 1 ) } <!-- PlusOne    -->
+			if (boardBonus[30] == 0 && board[ 6] > 0) { boardBonus[30] = 1; addItem(  5, 1 ) } <!-- Yellow "x" -->
+			if (boardBonus[31] == 0 && board[ 7] > 0) { boardBonus[31] = 1;                  } <!-- Red Swan   -->
+			if (boardBonus[32] == 0 && board[ 8] > 0) { boardBonus[32] = 1; addItem(  2, 1 ) } <!-- ReRoll     -->
+			if (boardBonus[33] == 0 && board[ 9] > 0) { boardBonus[33] = 1; addItem(  7, 1 ) } <!-- Green "x"  -->
+			if (boardBonus[34] == 0 && board[10] > 0) { boardBonus[34] = 1; addItem(  8, 6 ) } <!-- Orange "6" -->
+			if (boardBonus[35] == 0 && board[11] > 0) { boardBonus[35] = 1; addItem(  4, 1 ) } <!-- PlusOne    -->
+		}
+	} else if (boardVariant == 2)
+	{
+		if (group == 1) { <!-- Round -->
+			if (boardBonus[ 1] == 0 && board[ 1] > 0) { boardBonus[ 1] = 1; addItem(  2, 1 ) } <!-- ReRoll    -->
+			if (boardBonus[ 2] == 0 && board[ 2] > 0) { boardBonus[ 2] = 1; addItem(  4, 1 ) } <!-- PlusOne   -->
+			if (boardBonus[ 3] == 0 && board[ 3] > 0) { boardBonus[ 3] = 1; addItem(  3, 1 ) } <!-- ReTake    -->
+			if (boardBonus[ 4] == 0 && board[ 4] > 0) { boardBonus[ 4] = 1; addItem( 11, 9 ) } <!-- Black "?" -->
+		} else if (group >= 2 && group <= 4) { <!-- ReRoll/ReTake/PlusOne -->
+			if (boardBonus[ 5] == 0 && board[ board.length-1 ] >= 1 && group == 2) { boardBonus[ 5] = 1;                  } <!-- Red Swan   -->
+			if (boardBonus[ 6] == 0 && board[ board.length-1 ] >= 1 && group == 3) { boardBonus[ 6] = 1; addItem(  9, 6 ) } <!-- Pink "?"   -->
+			if (boardBonus[ 7] == 0 && board[ board.length-1 ] >= 1 && group == 4) { boardBonus[ 7] = 1; addItem(  5, 1 ) } <!-- Silver "?" -->
+		} else if (group == 5) { <!-- Silver -->
+			if (boardBonus[ 8] == 0 && board[ 1] > 0 && board[ 7] > 0 && board[13] > 0 && board[19] > 0) { boardBonus[ 8] = 1; addItem( 4, 1 ) } <!-- PlusOne    -->
+			if (boardBonus[ 9] == 0 && board[ 2] > 0 && board[ 8] > 0 && board[14] > 0 && board[20] > 0) { boardBonus[ 9] = 1; addItem( 6, 1 ) } <!-- Yellow "?" -->
+			if (boardBonus[10] == 0 && board[ 3] > 0 && board[ 9] > 0 && board[15] > 0 && board[21] > 0) { boardBonus[10] = 1;                 } <!-- Red Swan   -->
+			if (boardBonus[11] == 0 && board[ 4] > 0 && board[10] > 0 && board[16] > 0 && board[22] > 0) { boardBonus[11] = 1; addItem( 7, 2 ) } <!-- Blue "?"   -->
+			if (boardBonus[12] == 0 && board[ 5] > 0 && board[11] > 0 && board[17] > 0 && board[23] > 0) { boardBonus[12] = 1; addItem( 8, 6 ) } <!-- Green "?"  -->
+			if (boardBonus[13] == 0 && board[ 6] > 0 && board[12] > 0 && board[18] > 0 && board[24] > 0) { boardBonus[13] = 1; addItem( 9, 6 ) } <!-- Pink "?"   -->
+		} else if (group == 6) { <!-- Yellow -->  <!-- Bonus is applied when full row/col is "circle", not "check" -->
+			if (boardBonus[14] == 0 && board[ 2] >= 1 && board[ 4] >= 1                  ) { boardBonus[14] = 1; addItem( 7, 2 ) } <!-- Blue "?"   -->
+			if (boardBonus[15] == 0 && board[ 5] >= 1 && board[ 7] >= 1                  ) { boardBonus[15] = 1; addItem( 3, 1 ) } <!-- ReTake     -->
+			if (boardBonus[16] == 0 && board[10] >= 1 && board[12] >= 1                  ) { boardBonus[16] = 1; addItem( 6, 1 ) } <!-- Yellow "?" -->
+			if (boardBonus[17] == 0 && board[13] >= 1 && board[15] >= 1                  ) { boardBonus[17] = 1; addItem( 8, 6 ) } <!-- Green "?"  -->
+			if (boardBonus[18] == 0 && board[18] >= 1 && board[20] >= 1                  ) { boardBonus[18] = 1; addItem( 9, 6 ) } <!-- Pink "?"   -->
+			if (boardBonus[19] == 0 && board[ 5] >= 1 && board[13] >= 1                  ) { boardBonus[19] = 1; addItem( 2, 1 ) } <!-- ReRoll     -->
+			if (boardBonus[20] == 0 && board[ 2] >= 1 && board[10] >= 1 && board[18] >= 1) { boardBonus[20] = 1; addItem( 4, 1 ) } <!-- PlusOne    -->
+			if (boardBonus[21] == 0 && board[ 7] >= 1 && board[15] >= 1                  ) { boardBonus[21] = 1; addItem( 5, 1 ) } <!-- Silver "?" -->
+			if (boardBonus[22] == 0 && board[ 4] >= 1 && board[12] >= 1 && board[20] >= 1) { boardBonus[22] = 1;                 } <!-- Red Swan   -->
+		} else if (group == 7) { <!-- Blue -->
+			if (boardBonus[23] == 0 && board[ 2] > 0) { boardBonus[23] = 1; addItem(  3, 1 ) } <!-- ReTake     -->
+			if (boardBonus[24] == 0 && board[ 3] > 0) { boardBonus[24] = 1; addItem(  6, 1 ) } <!-- Yellow "?" -->
+			if (boardBonus[25] == 0 && board[ 5] > 0) { boardBonus[25] = 1; addItem(  4, 1 ) } <!-- PlusOne    -->
+			if (boardBonus[26] == 0 && board[ 6] > 0) { boardBonus[26] = 1; addItem(  2, 1 ) } <!-- ReRoll     -->
+			if (boardBonus[27] == 0 && board[ 7] > 0) { boardBonus[27] = 1; addItem(  9, 6 ) } <!-- Pink "?"   -->
+			if (boardBonus[28] == 0 && board[ 9] > 0) { boardBonus[28] = 1;                  } <!-- Red Swan   -->
+			if (boardBonus[29] == 0 && board[10] > 0) { boardBonus[29] = 1; addItem(  3, 1 ) } <!-- ReTake     -->
+			if (boardBonus[30] == 0 && board[12] > 0) { boardBonus[30] = 1; addItem(  8, 6 ) } <!-- Green "?"  -->
+		} else if (group == 8) { <!-- Green -->
+			if (boardBonus[31] == 0 && board[ 2] > 0) { boardBonus[31] = 1; addItem(  2, 1 ) } <!-- ReRoll     -->
+			if (boardBonus[32] == 0 && board[ 4] > 0) { boardBonus[32] = 1; addItem(  7, 2 ) } <!-- Blue "?"   -->
+			if (boardBonus[33] == 0 && board[ 5] > 0) { boardBonus[33] = 1; addItem(  3, 1 ) } <!-- ReTake     -->
+			if (boardBonus[34] == 0 && board[ 7] > 0) { boardBonus[34] = 1;                  } <!-- Red Swan   -->
+			if (boardBonus[35] == 0 && board[ 8] > 0) { boardBonus[35] = 1; addItem(  5, 1 ) } <!-- Silver "?" -->
+			if (boardBonus[36] == 0 && board[ 9] > 0) { boardBonus[36] = 1; addItem(  4, 1 ) } <!-- PlusOne    -->
+			if (boardBonus[37] == 0 && board[11] > 0) { boardBonus[37] = 1; addItem(  9, 6 ) } <!-- Pink "?"   -->
+			if (boardBonus[38] == 0 && board[12] > 0) { boardBonus[38] = 1; addItem(  6, 1 ) } <!-- Yellow "?" -->
+		} else if (group == 9) { <!-- Pink -->
+			if (boardBonus[39] == 0 && board[ 3] >= 2) { boardBonus[39] = 1; addItem(  2, 1 ) } <!-- ReRoll     -->
+			if (boardBonus[40] == 0 && board[ 4] >= 3) { boardBonus[40] = 1; addItem(  3, 1 ) } <!-- ReTake     -->
+			if (boardBonus[41] == 0 && board[ 5] >= 4) { boardBonus[41] = 1; addItem(  4, 1 ) } <!-- PlusOne    -->
+			if (boardBonus[42] == 0 && board[ 6] >= 5) { boardBonus[42] = 1; addItem(  8, 6 ) } <!-- Green "?"  -->
+			if (boardBonus[43] == 0 && board[ 7] >= 6) { boardBonus[43] = 1; addItem(  6, 1 ) } <!-- Yellow "?" -->
+			if (boardBonus[44] == 0 && board[ 8] >= 2) { boardBonus[44] = 1;                  } <!-- Red Swan   -->
+			if (boardBonus[45] == 0 && board[ 9] >= 3) { boardBonus[45] = 1; addItem(  5, 1 ) } <!-- Silver "?" -->
+			if (boardBonus[46] == 0 && board[10] >= 4) { boardBonus[46] = 1; addItem(  2, 1 ) } <!-- ReRoll     -->
+			if (boardBonus[47] == 0 && board[11] >= 5) { boardBonus[47] = 1; addItem(  7, 2 ) } <!-- Blue "?"   -->
+			if (boardBonus[48] == 0 && board[12] >= 6) { boardBonus[48] = 1; addItem(  6, 1 ) } <!-- Yellow "?" -->
+		}
+	}
+
+	<!-- Calculate and display score -->
+	x = (boardWidth/2);	if (boardSettingsRotate != 0) { x -= boardWidth }
+	var xx = x;   if (boardSettingsRotate != 0) { xx += boardWidth } <!-- HTML bug? Needs separate var -->
+	var yy = 390; if (boardVariant == 2) { yy += 13 }
+	ctx.drawImage( document.getElementById(CleverImage), xx-175, yy, 350, 50, x-175, yy, 350, 50 );
+	ctx.fillStyle = "red";   ctx.fillText("Score: " + calcScore(), x, yy+46);
+	
+	return marker;
+}
+
+
+function userKeyInput( event ) {
+
+	if (debugOn >= 6) { debugLog += " '" + event.keyCode + "'";	document.getElementById("debuglog").innerHTML = debugLog }
+
+	switch (event.keyCode) {
+		case  26: userHistory( -1 ); break; <!-- Ctrl+Z = Undo -->
+		case  25: userHistory( +1 ); break; <!-- Ctrl+Y = Redo -->
+		case  49: if (startCounter > 0) { boardVariant = 1; userHistory(0) } else { startCounter += 1 }; break; <!-- 2x '1' = Start variant 1 -->
+		case  50: if (startCounter > 0) { boardVariant = 2; userHistory(0) } else { startCounter += 1 }; break; <!-- 2x '2' = Start variant 2 -->
+		case  82: <!-- 'r'|'R' = Rotate -->
+		case 114: userHistory( 999 ); break; <!-- Switch between board variants -->
+	}
+}
+
+function userInput( event ) {
+	var x = (boardSettingsRotate == 0) ? event.offsetX : boardWidth-event.offsetY;
+	var y = (boardSettingsRotate == 0) ? event.offsetY : event.offsetX;
+	var debugText = "X" + event.offsetX + " Y" + event.offsetY + " R" + boardSettingsRotate + " X" + x + " Y" + y;
+	var group     =  0;
+	var index     = -1;
+	var value     =  0;
+	var xD        =  0;
+
+	if (debugOn >= 1) { document.getElementById("debuglog").innerHTML = debugLog; }
+
+	if ( x<33 && y>boardHeight-33 ) { boardVariant = (boardVariant == 1) ? 2 : 1; userHistory( 0 ) } <!-- Bottom left corner contains hidden feature to toggle board variants -->
+	else if ( x < 135 && y < 425 ){
+		if ( x<33 && y<33 ) { userHistory( 999 ) } <!-- Top left corner contains the hidden feature to toggle rotation --> 
+		else if ( y < 130 ) { if (startCounter > 0) { userHistory(0) } else { startCounter += 2 } } <!-- Restart (double confirm) -->
+		else if ( y < 265 ) { userHistory( -1 ); } <!-- Undo  -->
+		else if ( y < 425 ) { userHistory( +1 ); } <!-- Redo  -->
+	} else if ( x >= 135 && y < 125 ) {
+		group = 1; <!-- Round -->
+		index = 0;
+	} else if ( x >= 135 && y < 225 ) {
+		group = 2; <!-- ReRoll -->
+		index = 0;
+	} else if ( x >= 135 && y < 310 ) {
+		group = 3; <!-- ReTake -->
+		index = 0;
+	} else if ( x >= 135 && y < 425 ) {
+		group = 4; <!-- PlusOne -->
+		index = 0;
+	} else if ( x < boardWidth/2 && y >= 425 && y < 950 ) {
+		group = 5; <!-- v0 Yellow | v1 Silver -->
+		if (boardVariant == 1)
+		{
+			if ( y >= 470 && y < 555 ) {
+				if ( x >=  30 && x < 120 ) { index =  1 }
+				if ( x >= 120 && x < 210 ) { index =  2 }
+				if ( x >= 210 && x < 300 ) { index =  3 }
+				if ( x >= 300 && x < 390 ) { index =  4 }
+			} else if ( y >= 555 && y < 645 ) {
+				if ( x >=  30 && x < 120 ) { index =  5 }
+				if ( x >= 120 && x < 210 ) { index =  6 }
+				if ( x >= 210 && x < 300 ) { index =  7 }
+				if ( x >= 300 && x < 390 ) { index =  8 }
+			} else if ( y >= 645 && y < 735 ) {
+				if ( x >=  30 && x < 120 ) { index =  9 }
+				if ( x >= 120 && x < 210 ) { index = 10 }
+				if ( x >= 210 && x < 300 ) { index = 11 }
+				if ( x >= 300 && x < 390 ) { index = 12 }
+			} else if ( y >= 735 && y < 825 ) {
+				if ( x >=  30 && x < 120 ) { index = 13 }
+				if ( x >= 120 && x < 210 ) { index = 14 }
+				if ( x >= 210 && x < 300 ) { index = 15 }
+				if ( x >= 300 && x < 390 ) { index = 16 }
+			}
+		} else if (boardVariant == 2)
+		{
+			if ( y >= 513 && y < 601 ) {
+				if ( x >=  27 && x < 106 ) { index =  1 }
+				if ( x >= 106 && x < 185 ) { index =  2 }
+				if ( x >= 185 && x < 264 ) { index =  3 }
+				if ( x >= 264 && x < 343 ) { index =  4 }
+				if ( x >= 343 && x < 422 ) { index =  5 }
+				if ( x >= 422 && x < 501 ) { index =  6 }
+			} else if ( y >= 601 && y < 689 ) {
+				if ( x >=  27 && x < 106 ) { index =  7 }
+				if ( x >= 106 && x < 185 ) { index =  8 }
+				if ( x >= 185 && x < 264 ) { index =  9 }
+				if ( x >= 264 && x < 343 ) { index = 10 }
+				if ( x >= 343 && x < 422 ) { index = 11 }
+				if ( x >= 422 && x < 501 ) { index = 12 }
+			} else if ( y >= 689 && y < 777 ) {
+				if ( x >=  27 && x < 106 ) { index = 13 }
+				if ( x >= 106 && x < 185 ) { index = 14 }
+				if ( x >= 185 && x < 264 ) { index = 15 }
+				if ( x >= 264 && x < 343 ) { index = 16 }
+				if ( x >= 343 && x < 422 ) { index = 17 }
+				if ( x >= 422 && x < 501 ) { index = 18 }
+			} else if ( y >= 777 && y < 865 ) {
+				if ( x >=  27 && x < 106 ) { index = 19 }
+				if ( x >= 106 && x < 185 ) { index = 20 }
+				if ( x >= 185 && x < 264 ) { index = 21 }
+				if ( x >= 264 && x < 343 ) { index = 22 }
+				if ( x >= 343 && x < 422 ) { index = 23 }
+				if ( x >= 422 && x < 501 ) { index = 24 }
+			}
+		}
+	} else if ( x > boardWidth/2 && y >= 425 && y < 950 ) {
+		group = 6; <!-- Blue -->
+		if (boardVariant == 1)
+		{
+			if ( y >= 555 && y < 645 ) {
+				if ( x >= 560 && x < 645 ) { index =  1 }
+				if ( x >= 645 && x < 735 ) { index =  2 }
+				if ( x >= 735 && x < 825 ) { index =  3 }
+				if ( x >= 825 && x < 915 ) { index =  4 }
+			} else if ( y >= 645 && y < 735 ) {
+				if ( x >= 560 && x < 645 ) { index =  5 }
+				if ( x >= 645 && x < 735 ) { index =  6 }
+				if ( x >= 735 && x < 825 ) { index =  7 }
+				if ( x >= 825 && x < 915 ) { index =  8 }
+			} else if ( y >= 735 && y < 825 ) {
+				if ( x >= 560 && x < 645 ) { index =  9 }
+				if ( x >= 645 && x < 735 ) { index = 10 }
+				if ( x >= 735 && x < 825 ) { index = 11 }
+				if ( x >= 825 && x < 915 ) { index = 12 }
+			}
+		} else if (boardVariant == 2)
+		{
+			if ( y >= 555 && y < 645 ) {
+				if ( x >= 645 && x < 735 ) { index =  2 }
+				if ( x >= 825 && x < 915 ) { index =  4 }
+			}
+			if ( y >= 600 && y < 690 ) {
+				if ( x >= 560 && x < 645 ) { index =  5 }
+				if ( x >= 735 && x < 825 ) { index =  7 }
+			}
+			if ( y >= 645 && y < 735 ) {
+				if ( x >= 645 && x < 735 ) { index = 10 }
+				if ( x >= 825 && x < 915 ) { index = 12 }
+			}
+			if ( y >= 690 && y < 780 ) {
+				if ( x >= 560 && x < 645 ) { index = 13 }
+				if ( x >= 735 && x < 825 ) { index = 15 }
+			} 
+			if ( y >= 735 && y < 825 ) {
+				if ( x >= 645 && x < 735 ) { index = 18 }
+				if ( x >= 825 && x < 915 ) { index = 20 }
+			}
+		}
+	} else if ( y >= 950 && y < 1135 ) {
+		group = 7; <!-- v1 Green | v2 Blue -->
+		if (boardVariant == 1) { index = 0 }
+		if (boardVariant == 2) { index = Math.floor((x+4)/(84-8)); value = 2 }
+	} else if ( y >= 1135 && y < 1285 ) {
+		group = 8; <!-- v1 Orange | v2 Green -->
+		xD = (boardVariant == 2) ? 84-8 : 84;
+		index = Math.floor((x+4)/xD); value = 1;
+	} else if ( y >= 1285 ) {
+		group = 9; <!-- v1 Purple | v2 Pink -->
+		xD = (boardVariant == 2) ? 84-8 : 84;
+		index = Math.floor((x+4)/xD); value = 6;
+	}
+	
+	if (startCounter > 0) { startCounter-- } <!-- Reset start counter on user input -->
+
+	debugText += " G" + group + " I" + index + " V" + value + " B" + bonusList;
+	if (debugOn >= 1) { document.getElementById("debuglog1").innerHTML = "1) userInput() " + debugText; }
+
+	if (group > 0 && index >= 0) { if (markItem( group, index, value, "user" ) != "none") { addHistory( group, index, value ) }}
+}
+
+</script>
+
+<p id="debuglog1"></p>
+<p id="debuglog2"></p>
+<p id="debuglog3"></p>
+<p id="debuglog4"></p>
+<p id="debuglog5"></p>
+<p id="debuglog6"></p>
+<p id="debuglog7"></p>
+<p id="debuglog"></p>
+
+<address>"Clever" by Wolfgang Warsch - 999 Games - HTML programming by Ric Zwanenberg (December 2020; v221110a)</address>
+
+</body>
+</html>
