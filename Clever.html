@@ -24,7 +24,7 @@
 <!---------------------------------------------------------->
 <!-- ToDo & Wishlist:                                     -->
 <!-- 1) run it on a mobile phone or tablet                -->
-<!-- 2) bonus actions for v2 blue/green/pink              -->
+<!-- 2) bonus actions for v2 "?" blue/green/pink          -->
 <!-- 3) undo bonus actions for pink if digit too low      -->
 <!--                                                      -->
 <!-- 6) scale to screen width/height                      -->
@@ -254,10 +254,10 @@ function calcScore () {
 
 	var colorScoreTotal   = [ 0,  0,  0,  0,  0,  0 ];                             <!-- Total score per color, index 0 for bonus score -->
 
-	var colorScoreYellow  = [ 0, 10, 14, 16, 20 ];                                 <!-- Score table for columns of yellow marks        -->
-	var colorScoreBlue    = [ 0,  1,  2,  4,  7, 11, 16, 22, 29, 37, 46, 56 ];     <!-- Score table for number of blue marks           -->
-	var colorScoreGreen   = [ 0,  1,  3,  6, 10, 15, 21, 28, 36, 45, 55, 66 ];     <!-- Score table for number of green marks          -->
-	var colorScoreOrange  = [ 0,  1,  1,  1,  2,  1,  1,  2,  1,  2,  1,  3 ];     <!-- Multiplication factors for orange marks        -->
+	var colorScore1Yellow = [ 0, 10, 14, 16, 20 ];                                 <!-- Score table for columns of yellow marks        -->
+	var colorScore1Blue   = [ 0,  1,  2,  4,  7, 11, 16, 22, 29, 37, 46, 56 ];     <!-- Score table for number of blue marks           -->
+	var colorScore1Green  = [ 0,  1,  3,  6, 10, 15, 21, 28, 36, 45, 55, 66 ];     <!-- Score table for number of green marks          -->
+	var colorScore1Orange = [ 0,  1,  1,  1,  2,  1,  1,  2,  1,  2,  1,  3 ];     <!-- Multiplication factors for orange marks        -->
 
 	var colorScore2Silver = [ 0,  2,  4,  7, 11,  16,  22 ];                       <!-- Score table for number of marks per color      -->
 	var colorScore2Yellow = [ 0,  3, 10, 21, 36, 55, 75, 96,118,141,165 ];         <!-- Score table for number of yellow marks         -->
@@ -273,21 +273,21 @@ function calcScore () {
 	if (boardVariant == 1) <!-- Clever Original -->
 	{
 		board = board1Yellow; colorScoreTotal[1] = 0;
-		if (board[ 1] > 0 && board[ 5] > 0 && board[ 9] > 0) { colorScoreTotal[1] += colorScoreYellow[1] } <!-- 1st column -->
-		if (board[ 2] > 0 && board[ 6] > 0 && board[14] > 0) { colorScoreTotal[1] += colorScoreYellow[2] } <!-- 2nd column -->
-		if (board[ 3] > 0 && board[11] > 0 && board[15] > 0) { colorScoreTotal[1] += colorScoreYellow[3] } <!-- 3rd column -->
-		if (board[ 8] > 0 && board[12] > 0 && board[16] > 0) { colorScoreTotal[1] += colorScoreYellow[4] } <!-- 4th column -->
+		if (board[ 1] > 0 && board[ 5] > 0 && board[ 9] > 0) { colorScoreTotal[1] += colorScore1Yellow[1] } <!-- 1st column -->
+		if (board[ 2] > 0 && board[ 6] > 0 && board[14] > 0) { colorScoreTotal[1] += colorScore1Yellow[2] } <!-- 2nd column -->
+		if (board[ 3] > 0 && board[11] > 0 && board[15] > 0) { colorScoreTotal[1] += colorScore1Yellow[3] } <!-- 3rd column -->
+		if (board[ 8] > 0 && board[12] > 0 && board[16] > 0) { colorScoreTotal[1] += colorScore1Yellow[4] } <!-- 4th column -->
 
 		board = board1Blue  ; colorScoreTotal[2] = 0; colorCounter = 0;
 		for (i=2; i < board.length; i++) { if (board[i] > 0) { colorCounter++ } }
-		colorScoreTotal[2] = colorScoreBlue[colorCounter];
+		colorScoreTotal[2] = colorScore1Blue[colorCounter];
 
 		board = board1Green ; colorScoreTotal[3] = 0; colorCounter = 0;
 		for (i=1; i < board.length; i++) { if (board[i] > 0) { colorCounter++ } }
-		colorScoreTotal[3] = colorScoreGreen[colorCounter];
+		colorScoreTotal[3] = colorScore1Green[colorCounter];
 
 		board = board1Orange; colorScoreTotal[4] = 0;
-		for (i=1; i < board.length; i++) { colorScoreTotal[4] += board[i] * colorScoreOrange[i] }
+		for (i=1; i < board.length; i++) { colorScoreTotal[4] += board[i] * colorScore1Orange[i] }
 
 		board = board1Purple; colorScoreTotal[5] = 0;
 		for (i=1; i < board.length; i++) { colorScoreTotal[5] += board[i] }
@@ -322,7 +322,7 @@ function calcScore () {
 		board = board2Pink; colorScoreTotal[5] = 0;
 		for (i=1; i < board.length; i++) { colorScoreTotal[5] += board[i] }
 
-		bonusCounter = boardBonus[5] + boardBonus[10] + boardBonus[22] + boardBonus[28] + boardBonus[34] + boardBonus[44];
+		bonusCounter = boardBonus[5] + boardBonus[10] + boardBonus[22] + boardBonus[28] + boardBonus[34] + boardBonus[44]; <!-- Locations of all the bonus red Swans -->
 		colorScoreTotal[0] = bonusCounter * Math.min( colorScoreTotal[1], colorScoreTotal[2], colorScoreTotal[3], colorScoreTotal[4], colorScoreTotal[5] );
 	}
 	else if (boardVariant == 3) <!-- Clever tot de 3e Macht -->
@@ -414,28 +414,28 @@ function addItem ( group, value, optout ) {
 			board = boardPlusOne;
 			if (board[0] < board.length) { i = board[0]; markItem( group, i, 0, "bonus" ) }
 		break;
-		case 5: <!-- v1 Yellow | v2 Silver -->
+		case 5: <!-- v1 Yellow | v2 Silver | v3 Yellow -->
 			markBonus( group, value ); 
 		break;
-		case 6: <!-- v1 Blue   | v2 Yellow -->
+		case 6: <!-- v1 Blue   | v2 Yellow | v3 Aqua   -->
 			markBonus( group, value ); 
 		break;
-		case 7: <!-- v1 Green  | v2 Blue   -->
+		case 7: <!-- v1 Green  | v2 Blue   | v3 Purple -->
 			board = (boardVariant == 2) ? board2Blue : board1Green;
 			if (board[0] < board.length) { i = board[0]; markItem( group, i, value, "bonus" ) }
 		break;
-		case 8: <!-- v1 Orange | v2 Green  -->
+		case 8: <!-- v1 Orange | v2 Green  | v3 Brown  -->
 			board = (boardVariant == 2) ? board2Green : board1Orange;
 			if (board[0] < board.length) { i = board[0]; markItem( group, i, value, "bonus" ) }
 		break;
-		case 9: <!-- v1 Purple | v2 Pink   -->
+		case 9: <!-- v1 Purple | v2 Pink   | v3 Pink   -->
 			board = (boardVariant == 2) ? board2Pink : board1Purple;
 			<!-- ToDo: remove bonus if optout parameter is provided as "undo" -->
 			if (board[0] < board.length) { i = board[0]; markItem( group, i, value, "bonus" ) }
 		break;
 		case 10: <!-- Black "6" -->
 		case 11: <!-- Black "x" -->
-			<!-- Indicate that user may add an extra mark for a specified color group -->
+			<!-- Indicate that user may add an extra "6" or mark for a specified color group -->
 			markBonus( group, value ); 
 		break;
 		default:
@@ -703,7 +703,7 @@ function markItem( group, index, value, source ) {
 			if (boardBonus[ 4] == 0 && board[ 4] > 0) { boardBonus[ 4] = 1; addItem( 11, 9 ) } <!-- Black "?" -->
 		} else if (group >= 2 && group <= 4) { <!-- ReRoll/ReTake/PlusOne -->
 			if (boardBonus[ 5] == 0 && board[ board.length-1 ] >= 1 && group == 2) { boardBonus[ 5] = 1;                  } <!-- Red Swan   -->
-			if (boardBonus[ 6] == 0 && board[ board.length-1 ] >= 1 && group == 3) { boardBonus[ 6] = 1; addItem(  9, 1 ) } <!-- Pink "?"   -->
+			if (boardBonus[ 6] == 0 && board[ board.length-1 ] >= 1 && group == 3) { boardBonus[ 6] = 1; addItem(  9, 6 ) } <!-- Pink "?"   -->
 			if (boardBonus[ 7] == 0 && board[ board.length-1 ] >= 1 && group == 4) { boardBonus[ 7] = 1; addItem(  5, 1 ) } <!-- Silver "?" -->
 		} else if (group == 5) { <!-- Silver -->
 			if (boardBonus[ 8] == 0 && board[ 1] > 0 && board[ 7] > 0 && board[13] > 0 && board[19] > 0) { boardBonus[ 8] = 1; addItem( 4, 1 ) } <!-- PlusOne    -->
@@ -711,13 +711,13 @@ function markItem( group, index, value, source ) {
 			if (boardBonus[10] == 0 && board[ 3] > 0 && board[ 9] > 0 && board[15] > 0 && board[21] > 0) { boardBonus[10] = 1;                 } <!-- Red Swan   -->
 			if (boardBonus[11] == 0 && board[ 4] > 0 && board[10] > 0 && board[16] > 0 && board[22] > 0) { boardBonus[11] = 1; addItem( 7, 2 ) } <!-- Blue "?"   -->
 			if (boardBonus[12] == 0 && board[ 5] > 0 && board[11] > 0 && board[17] > 0 && board[23] > 0) { boardBonus[12] = 1; addItem( 8, 1 ) } <!-- Green "?"  -->
-			if (boardBonus[13] == 0 && board[ 6] > 0 && board[12] > 0 && board[18] > 0 && board[24] > 0) { boardBonus[13] = 1; addItem( 9, 1 ) } <!-- Pink "?"   -->
+			if (boardBonus[13] == 0 && board[ 6] > 0 && board[12] > 0 && board[18] > 0 && board[24] > 0) { boardBonus[13] = 1; addItem( 9, 6 ) } <!-- Pink "?"   -->
 		} else if (group == 6) { <!-- Yellow -->  <!-- Bonus is applied when full row/col is "circle", not "check" -->
 			if (boardBonus[14] == 0 && board[ 2] >= 1 && board[ 4] >= 1                  ) { boardBonus[14] = 1; addItem( 7, 2 ) } <!-- Blue "?"   -->
 			if (boardBonus[15] == 0 && board[ 5] >= 1 && board[ 7] >= 1                  ) { boardBonus[15] = 1; addItem( 3, 1 ) } <!-- ReTake     -->
 			if (boardBonus[16] == 0 && board[10] >= 1 && board[12] >= 1                  ) { boardBonus[16] = 1; addItem( 6, 1 ) } <!-- Yellow "?" -->
 			if (boardBonus[17] == 0 && board[13] >= 1 && board[15] >= 1                  ) { boardBonus[17] = 1; addItem( 8, 1 ) } <!-- Green "?"  -->
-			if (boardBonus[18] == 0 && board[18] >= 1 && board[20] >= 1                  ) { boardBonus[18] = 1; addItem( 9, 1 ) } <!-- Pink "?"   -->
+			if (boardBonus[18] == 0 && board[18] >= 1 && board[20] >= 1                  ) { boardBonus[18] = 1; addItem( 9, 6 ) } <!-- Pink "?"   -->
 			if (boardBonus[19] == 0 && board[ 5] >= 1 && board[13] >= 1                  ) { boardBonus[19] = 1; addItem( 2, 1 ) } <!-- ReRoll     -->
 			if (boardBonus[20] == 0 && board[ 2] >= 1 && board[10] >= 1 && board[18] >= 1) { boardBonus[20] = 1; addItem( 4, 1 ) } <!-- PlusOne    -->
 			if (boardBonus[21] == 0 && board[ 7] >= 1 && board[15] >= 1                  ) { boardBonus[21] = 1; addItem( 5, 1 ) } <!-- Silver "?" -->
@@ -727,7 +727,7 @@ function markItem( group, index, value, source ) {
 			if (boardBonus[24] == 0 && board[ 3] > 0) { boardBonus[24] = 1; addItem(  6, 1 ) } <!-- Yellow "?" -->
 			if (boardBonus[25] == 0 && board[ 5] > 0) { boardBonus[25] = 1; addItem(  4, 1 ) } <!-- PlusOne    -->
 			if (boardBonus[26] == 0 && board[ 6] > 0) { boardBonus[26] = 1; addItem(  2, 1 ) } <!-- ReRoll     -->
-			if (boardBonus[27] == 0 && board[ 7] > 0) { boardBonus[27] = 1; addItem(  9, 1 ) } <!-- Pink "?"   -->
+			if (boardBonus[27] == 0 && board[ 7] > 0) { boardBonus[27] = 1; addItem(  9, 6 ) } <!-- Pink "?"   -->
 			if (boardBonus[28] == 0 && board[ 9] > 0) { boardBonus[28] = 1;                  } <!-- Red Swan   -->
 			if (boardBonus[29] == 0 && board[10] > 0) { boardBonus[29] = 1; addItem(  3, 1 ) } <!-- ReTake     -->
 			if (boardBonus[30] == 0 && board[12] > 0) { boardBonus[30] = 1; addItem(  8, 1 ) } <!-- Green "?"  -->
@@ -738,7 +738,7 @@ function markItem( group, index, value, source ) {
 			if (boardBonus[34] == 0 && board[ 7] > 0) { boardBonus[34] = 1;                  } <!-- Red Swan   -->
 			if (boardBonus[35] == 0 && board[ 8] > 0) { boardBonus[35] = 1; addItem(  5, 1 ) } <!-- Silver "?" -->
 			if (boardBonus[36] == 0 && board[ 9] > 0) { boardBonus[36] = 1; addItem(  4, 1 ) } <!-- PlusOne    -->
-			if (boardBonus[37] == 0 && board[11] > 0) { boardBonus[37] = 1; addItem(  9, 1 ) } <!-- Pink "?"   -->
+			if (boardBonus[37] == 0 && board[11] > 0) { boardBonus[37] = 1; addItem(  9, 6 ) } <!-- Pink "?"   -->
 			if (boardBonus[38] == 0 && board[12] > 0) { boardBonus[38] = 1; addItem(  6, 1 ) } <!-- Yellow "?" -->
 		} else if (group == 9) { <!-- Pink -->
 			if (boardBonus[39] == 0 && board[ 3] >= 2) { boardBonus[39] = 1; addItem(  2, 1 ) } <!-- ReRoll     -->
@@ -941,7 +941,7 @@ function userInput( event ) {
 <p id="debuglog7"></p>
 <p id="debuglog"></p>
 
-<address>"Clever" by Wolfgang Warsch - 999 Games - HTML programming by Ric Zwanenberg (December 2020; v221109a)</address>
+<address>"Clever" by Wolfgang Warsch - 999 Games - HTML programming by Ric Zwanenberg (December 2020; v221109b)</address>
 
 </body>
 </html>
