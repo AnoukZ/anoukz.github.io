@@ -560,6 +560,9 @@ function markItem( group, index, value, source ) {
 					}
 				} else if (boardVariant == 2)
 				{
+					if (source == "bonus") {             <!-- In case of bonus use 12 or previous value as highest possible -->
+						if (i > 1) { value = board[i-1] } else { value = 12 }
+					}
 					if (i >= 1 && i < board.length) {
 						if (board[i] == 0 && i == board[0])         <!-- Add specified digit to specified item, only if empty and next in line -->
 						{
@@ -710,13 +713,13 @@ function markItem( group, index, value, source ) {
 			if (boardBonus[ 9] == 0 && board[ 2] > 0 && board[ 8] > 0 && board[14] > 0 && board[20] > 0) { boardBonus[ 9] = 1; addItem( 6, 1 ) } <!-- Yellow "?" -->
 			if (boardBonus[10] == 0 && board[ 3] > 0 && board[ 9] > 0 && board[15] > 0 && board[21] > 0) { boardBonus[10] = 1;                 } <!-- Red Swan   -->
 			if (boardBonus[11] == 0 && board[ 4] > 0 && board[10] > 0 && board[16] > 0 && board[22] > 0) { boardBonus[11] = 1; addItem( 7, 2 ) } <!-- Blue "?"   -->
-			if (boardBonus[12] == 0 && board[ 5] > 0 && board[11] > 0 && board[17] > 0 && board[23] > 0) { boardBonus[12] = 1; addItem( 8, 1 ) } <!-- Green "?"  -->
+			if (boardBonus[12] == 0 && board[ 5] > 0 && board[11] > 0 && board[17] > 0 && board[23] > 0) { boardBonus[12] = 1; addItem( 8, 6 ) } <!-- Green "?"  -->
 			if (boardBonus[13] == 0 && board[ 6] > 0 && board[12] > 0 && board[18] > 0 && board[24] > 0) { boardBonus[13] = 1; addItem( 9, 6 ) } <!-- Pink "?"   -->
 		} else if (group == 6) { <!-- Yellow -->  <!-- Bonus is applied when full row/col is "circle", not "check" -->
 			if (boardBonus[14] == 0 && board[ 2] >= 1 && board[ 4] >= 1                  ) { boardBonus[14] = 1; addItem( 7, 2 ) } <!-- Blue "?"   -->
 			if (boardBonus[15] == 0 && board[ 5] >= 1 && board[ 7] >= 1                  ) { boardBonus[15] = 1; addItem( 3, 1 ) } <!-- ReTake     -->
 			if (boardBonus[16] == 0 && board[10] >= 1 && board[12] >= 1                  ) { boardBonus[16] = 1; addItem( 6, 1 ) } <!-- Yellow "?" -->
-			if (boardBonus[17] == 0 && board[13] >= 1 && board[15] >= 1                  ) { boardBonus[17] = 1; addItem( 8, 1 ) } <!-- Green "?"  -->
+			if (boardBonus[17] == 0 && board[13] >= 1 && board[15] >= 1                  ) { boardBonus[17] = 1; addItem( 8, 6 ) } <!-- Green "?"  -->
 			if (boardBonus[18] == 0 && board[18] >= 1 && board[20] >= 1                  ) { boardBonus[18] = 1; addItem( 9, 6 ) } <!-- Pink "?"   -->
 			if (boardBonus[19] == 0 && board[ 5] >= 1 && board[13] >= 1                  ) { boardBonus[19] = 1; addItem( 2, 1 ) } <!-- ReRoll     -->
 			if (boardBonus[20] == 0 && board[ 2] >= 1 && board[10] >= 1 && board[18] >= 1) { boardBonus[20] = 1; addItem( 4, 1 ) } <!-- PlusOne    -->
@@ -730,7 +733,7 @@ function markItem( group, index, value, source ) {
 			if (boardBonus[27] == 0 && board[ 7] > 0) { boardBonus[27] = 1; addItem(  9, 6 ) } <!-- Pink "?"   -->
 			if (boardBonus[28] == 0 && board[ 9] > 0) { boardBonus[28] = 1;                  } <!-- Red Swan   -->
 			if (boardBonus[29] == 0 && board[10] > 0) { boardBonus[29] = 1; addItem(  3, 1 ) } <!-- ReTake     -->
-			if (boardBonus[30] == 0 && board[12] > 0) { boardBonus[30] = 1; addItem(  8, 1 ) } <!-- Green "?"  -->
+			if (boardBonus[30] == 0 && board[12] > 0) { boardBonus[30] = 1; addItem(  8, 6 ) } <!-- Green "?"  -->
 		} else if (group == 8) { <!-- Green -->
 			if (boardBonus[31] == 0 && board[ 2] > 0) { boardBonus[31] = 1; addItem(  2, 1 ) } <!-- ReRoll     -->
 			if (boardBonus[32] == 0 && board[ 4] > 0) { boardBonus[32] = 1; addItem(  7, 2 ) } <!-- Blue "?"   -->
@@ -744,7 +747,7 @@ function markItem( group, index, value, source ) {
 			if (boardBonus[39] == 0 && board[ 3] >= 2) { boardBonus[39] = 1; addItem(  2, 1 ) } <!-- ReRoll     -->
 			if (boardBonus[40] == 0 && board[ 4] >= 3) { boardBonus[40] = 1; addItem(  3, 1 ) } <!-- ReTake     -->
 			if (boardBonus[41] == 0 && board[ 5] >= 4) { boardBonus[41] = 1; addItem(  4, 1 ) } <!-- PlusOne    -->
-			if (boardBonus[42] == 0 && board[ 6] >= 5) { boardBonus[42] = 1; addItem(  8, 1 ) } <!-- Green "?"  -->
+			if (boardBonus[42] == 0 && board[ 6] >= 5) { boardBonus[42] = 1; addItem(  8, 6 ) } <!-- Green "?"  -->
 			if (boardBonus[43] == 0 && board[ 7] >= 6) { boardBonus[43] = 1; addItem(  6, 1 ) } <!-- Yellow "?" -->
 			if (boardBonus[44] == 0 && board[ 8] >= 2) { boardBonus[44] = 1;                  } <!-- Red Swan   -->
 			if (boardBonus[45] == 0 && board[ 9] >= 3) { boardBonus[45] = 1; addItem(  5, 1 ) } <!-- Silver "?" -->
@@ -941,7 +944,7 @@ function userInput( event ) {
 <p id="debuglog7"></p>
 <p id="debuglog"></p>
 
-<address>"Clever" by Wolfgang Warsch - 999 Games - HTML programming by Ric Zwanenberg (December 2020; v221109b)</address>
+<address>"Clever" by Wolfgang Warsch - 999 Games - HTML programming by Ric Zwanenberg (December 2020; v221110a)</address>
 
 </body>
 </html>
