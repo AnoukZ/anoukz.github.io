@@ -26,8 +26,8 @@
 <img    id="RitmeImage07" width=   0 height=   0  src="Ritme07.png"    alt="Ritme07.png missing">
 <img    id="RitmeImage08" width=   0 height=   0  src="Ritme08.png"    alt="Ritme08.png missing">
 <img    id="RitmeImage09" width=   0 height=   0  src="Ritme09.png"    alt="Ritme09.png missing">
-<br>
-<canvas id="myCanvas"     width=1100 height= 550 onclick="userInput(event)" tabindex=0 onkeypress="userKeyInput(event)">
+
+<canvas id="myCanvas"     width=1000 height= 500 onclick="userInput(event)" tabindex=0 onkeypress="userKeyInput(event)">
         Sorry, your browser does not support the HTML5 canvas tag.
 </canvas>
 
@@ -40,13 +40,14 @@ var boardWidth      = myCanvas.width;		<!-- original horizontal resolution of th
 var boardHeight     = myCanvas.height;		<!-- original vertical   resolution of the background image -->
 var boardDivider    = myCanvas.height/2;	<!-- divides the board in top (places) and bottom (rhythms) -->
 
-var clearEdge       = 25;					<!-- size of "Clear Screen" area in top lef/right corner    -->
+var clearEdge       = 20;					<!-- size of "Clear Screen" area in top lef/right corner    -->
 
 var rhythmWidth     = 100;					<!-- original horizontal resolution of a rhythm image       -->
 var rhythmHeight    = 146;					<!-- original vertical   resolution of a rhythm image       -->
 
-var fontLarge       = "italic bold 30px Comic Sans MS";
-var fontSmall       = "italic bold 20px Comic Sans MS";
+var fontSmall       = "italic      16px Comic Sans MS";
+var fontMedium      = "italic bold 30px Comic Sans MS";
+var fontLarge       = "            60px Comic Sans MS";
 
 var debugOn         = 0;		<!-- Activates all debug logging, 0: logging OFF, x: level 'x' logging ON (max 7) -->
 var debugLog        = "Info:";	<!-- Used for debug logging only -->
@@ -65,35 +66,41 @@ var selectedRhythm  = 0;		<!-- Indicates the Rhythm that is selected      -->
 
 window.onload = function()
 {
-	if (debugOn >= 7)  <!-- log dimensions of board, window and screen size -->
-	{
-		debugLog += " boardW:"        + boardWidth        + ",H:" + boardHeight
-		debugLog += " window.innerW:" + window.innerWidth + ",H:" + window.innerHeight;
-		debugLog += " screen.availW:" + screen.availWidth + ",H:" + screen.availHeight; <!-- minus taskbar -->
-		debugLog += " screen.W:"      + screen.width      + ",H:" + screen.height;      <!-- full physical screen -->
-	}
-
+	if (debugOn >= 7) logDimensions();
+	
 	initBoard();
 	drawBoard();
 }
 
 window.onresize = function()
 {
-	drawBoard ()
+	if (debugOn >= 7) logDimensions();
+
+	drawBoard();
+}
+
+function logDimensions ()
+{
+	<!-- log dimensions of board, window and screen size -->
+	debugLog  = "Info:";
+	debugLog += " boardW:"        + boardWidth        + ",H:" + boardHeight
+	debugLog += " window.innerW:" + window.innerWidth + ",H:" + window.innerHeight;
+	debugLog += " screen.availW:" + screen.availWidth + ",H:" + screen.availHeight; <!-- minus taskbar -->
+	debugLog += " screen.W:"      + screen.width      + ",H:" + screen.height;      <!-- full physical screen -->
 }
 
 function initBoard ()
 {
+	if (debugOn >= 6) { debugLog += " initBoard()"; document.getElementById("debuglog").innerHTML = debugLog; }
+
 	<!-- Boards use index 0 to indicate where the next marker should be drawn, values -1 and 9 indicate unused items -->
 	if (boardVariant != 1 & boardVariant != 2)
 	{
-		debugLog += " initBoard() error board variant " + boardVariant; document.getElementById("debuglog").innerHTML = debugLog;
+		debugLog += " Unknown board variant " + boardVariant; document.getElementById("debuglog").innerHTML = debugLog;
 	}
 
 	boardPlace = []; <!-- Clear all placeholders and then add a cleared (0) entry for each placeholder -->
 	for ( i = 0; i < maxNrOfPlaces ; i++ ) { boardPlace[i] = 0 }
-
-	if (debugOn >= 6) { debugLog += " initBoard()"; document.getElementById("debuglog").innerHTML = debugLog; }
 }
 
 function drawBoard ()
@@ -119,20 +126,32 @@ function drawBoard ()
 	ctx.fillStyle = "white";
 	ctx.fillRect( 0, 0, boardWidth, boardHeight );
 
-	ctx.font      = fontLarge;
-	ctx.fillStyle = "silver"; ctx.textBaseline = "top";  
-	ctx.textAlign = "left";   ctx.fillText( "X", 2, 2 );			<!-- Write X on top left of the window -->
-	ctx.textAlign = "right";  ctx.fillText( "X", boardWidth-2, 2 );	<!-- Write X on top right of the window -->
+	ctx.font         = fontMedium;
+	ctx.fillStyle    = "whitesmoke";
+//	ctx.fillStyle    = "gainsboro";
+//	ctx.fillStyle    = "silver";
+	ctx.textBaseline = "top";
+	ctx.textAlign    = "left";   ctx.fillText( "X", 2, 2 );			<!-- Write X on top left of the window -->
+	ctx.textAlign    = "right";  ctx.fillText( "X", boardWidth-2, 2 );	<!-- Write X on top right of the window -->
 
-	ctx.fillStyle = "ghostwhite";  ctx.textAlign = "center";  ctx.textBaseline = "top";
-	ctx.fillText( "Ritme Maker", boardWidth/2, 2 );				<!-- Write the title on the top center of the image -->
+//	ctx.fillStyle    = "ghostwhite";
+	ctx.textBaseline = "top";
+	ctx.textAlign    = "center"; ctx.fillText( "Ritme Maker", boardWidth/2, 2 );	<!-- Write the title on the top center of the image -->
+
+	ctx.font         = fontLarge;
+//	ctx.fillStyle    = "silver";
+	ctx.textBaseline = "middle";
+	ctx.textAlign    = "left";   ctx.fillText( "<", 0,          boardHeight*0.25 );	<!-- Write '<' on mid/left  of top    half -->
+	ctx.textAlign    = "right";  ctx.fillText( ">", boardWidth, boardHeight*0.25 );	<!-- Write '>' on mid/right of top    half -->
+	ctx.textAlign    = "left";   ctx.fillText( "<", 0,          boardHeight*0.75 );	<!-- Write '<' on mid/left  of bottom half -->
+	ctx.textAlign    = "right";  ctx.fillText( ">", boardWidth, boardHeight*0.75 );	<!-- Write '>' on mid/right of bottom half -->
 
 
-	ctx.lineWidth = "2";      ctx.strokeStyle = "black";		<!-- Properties of the Placeholder rectangles -->
+	ctx.lineWidth = "2";      ctx.strokeStyle = "black";	<!-- Properties of the Placeholder rectangles -->
 
 	if ( maxNrOfPlaces > 0 ) { width = boardWidth / maxNrOfPlaces }
 
-	for ( i = 0; i < maxNrOfPlaces ; i++ )						<!-- Draw and fill all placeholders -->
+	for ( i = 0; i < maxNrOfPlaces ; i++ )					<!-- Draw and fill all placeholders -->
 	{
 		xOffset = clearEdge;						<!-- Horizontal offset to stay away from left and right window edges     -->
 		yOffset = (boardDivider-rhythmHeight)/2;	<!-- Vertical offset to draw the Placeholder down from the window top    -->
@@ -148,10 +167,10 @@ function drawBoard ()
 		}
 	}
 	
-	ctx.lineWidth = "5"; ctx.strokeStyle = "ghostwhite";		<!-- Properties of the divider line   -->
-	ctx.strokeRect( 0, boardDivider, boardWidth, 1 );			<!-- Draw the top/bottom divider line -->
+	ctx.lineWidth = "5"; ctx.strokeStyle = "ghostwhite";	<!-- Properties of the divider line   -->
+	ctx.strokeRect( 0, boardDivider, boardWidth, 1 );		<!-- Draw the top/bottom divider line -->
 		
-	if ( maxNrOfRhythms > 0 ) { width = boardWidth / maxNrOfRhythms } ;
+	if ( maxNrOfRhythms > 0 ) { width = boardWidth / maxNrOfRhythms }
 
 	for ( i = 0 ; i < nrOfRhythms ; i++ )
 	{
@@ -182,52 +201,89 @@ function drawBoard ()
 
 function drawHelp ()
 {
-	var c     = document.getElementById("myCanvas"); c.focus();
-	var ctx   = myCanvas.getContext("2d");
+	var c         = document.getElementById("myCanvas"); c.focus();
+	var ctx       = myCanvas.getContext("2d");
 
-	boardWidth      = myCanvas.width;		<!-- original horizontal resolution of the background image -->
-	boardHeight     = myCanvas.height;		<!-- original vertical   resolution of the background image -->
-	boardDivider    = myCanvas.height/2;	<!-- divides the board in top (places) and bottom (rhythms) -->
+	boardWidth    = myCanvas.width;		<!-- original horizontal resolution of the background image -->
+	boardHeight   = myCanvas.height;	<!-- original vertical   resolution of the background image -->
+	boardDivider  = myCanvas.height/2;	<!-- divides the board in top (places) and bottom (rhythms) -->
 
 	ctx.save();		<!-- Save current context settings, to prevent changes in this function on general settings -->
 
 	ctx.font      = fontSmall;
 	ctx.fillStyle = "black";  ctx.textAlign = "center";  ctx.textBaseline = "middle";
 
-//	ctx.fillText( "Selecteer hieronder een ritme, klik daarna op een vak hierboven",        boardWidth/2, boardDivider-30 );
-//	ctx.fillText( "Klik op een 'X' of druk op <Enter> of <Ctrl-Z> om het bord te wissen",   boardWidth/2, boardDivider-10 );
-//	ctx.fillText( "Druk op '1', '2', '3', … '9' om het aantal ritme keuzes weer te geven",  boardWidth/2, boardDivider+30 );
-//	ctx.fillText( "Druk op <Spatie> om 3 of 4 vakken te kiezen, of '0' voor nog meer keus", boardWidth/2, boardDivider+10 );
+//	ctx.fillText( "Selecteer hieronder een ritme, klik daarna op een vak hierboven",       boardWidth/2, boardDivider-30 );
+//	ctx.fillText( "Klik op een 'X' of druk op <Enter> om het bord te wissen",              boardWidth/2, boardDivider-10 );
+//	ctx.fillText( "Druk op <Spatie> om 3 of 4 vakken te kiezen, of '0' voor meer keuzes",  boardWidth/2, boardDivider+10 );
+//	ctx.fillText( "Druk op '1', '2', '3', … '9' om het aantal ritme keuzes weer te geven", boardWidth/2, boardDivider+30 );
 
-	ctx.fillText( "Select a rhythm below, then click a position above",                boardWidth/2, boardDivider-45 );
-	ctx.fillText( "Click an 'X' or press <Enter> or <Ctrl-Z> to erase the board",      boardWidth/2, boardDivider-15 );
-	ctx.fillText( "Press '1', '2', '3', … '9' to select the number of rhythms below",  boardWidth/2, boardDivider+45 );
-	ctx.fillText( "Press <Space> to toggle 3 or 4 positions, or '0' for more options", boardWidth/2, boardDivider+15 );
+	ctx.fillText( "Select a rhythm below, then click a position above",                boardWidth/2, boardDivider-40 );
+	ctx.fillText( "Click an 'X' or press <Enter> to erase the board",                  boardWidth/2, boardDivider-20 );
+	ctx.fillText( "Click '<' or '>' to decrease or increase positions or rhythms",     boardWidth/2, boardDivider+00 );
+	ctx.fillText( "Press <Space> to toggle 3 / 4 positions, or '0' for more options", boardWidth/2, boardDivider+20 );
+	ctx.fillText( "Press '1', '2', '3', … '9' to select the number of rhythms below",  boardWidth/2, boardDivider+40 );
+
+	ctx.font         = fontMedium;
+//	ctx.fillStyle    = "whitesmoke";
+//	ctx.fillStyle    = "gainsboro";
+	ctx.fillStyle    = "silver";
+	ctx.textBaseline = "top";
+	ctx.textAlign    = "left";   ctx.fillText( "X", 2, 2 );			<!-- Write X on top left of the window -->
+	ctx.textAlign    = "right";  ctx.fillText( "X", boardWidth-2, 2 );	<!-- Write X on top right of the window -->
+
+//	ctx.fillStyle    = "ghostwhite";
+	ctx.textBaseline = "top";
+	ctx.textAlign    = "center"; ctx.fillText( "Ritme Maker", boardWidth/2, 2 );	<!-- Write the title on the top center of the image -->
+
+	ctx.font         = fontLarge;
+//	ctx.fillStyle    = "silver";
+	ctx.textBaseline = "middle";
+	ctx.textAlign    = "left";   ctx.fillText( "<", 0,          boardHeight*0.25 );	<!-- Write '<' on mid/left  of top    half -->
+	ctx.textAlign    = "right";  ctx.fillText( ">", boardWidth, boardHeight*0.25 );	<!-- Write '>' on mid/right of top    half -->
+	ctx.textAlign    = "left";   ctx.fillText( "<", 0,          boardHeight*0.75 );	<!-- Write '<' on mid/left  of bottom half -->
+	ctx.textAlign    = "right";  ctx.fillText( ">", boardWidth, boardHeight*0.75 );	<!-- Write '>' on mid/right of bottom half -->
 	
 	ctx.restore();	<!-- Restore previous context settings, as they where saved at the beginning of this function -->
+}
+
+function userKey( key )
+{
+	<!-- <Enter> to reset the board and clear the screen -->
+	if (key == 13) { initBoard(); selectedRhythm = 0 }
+
+	<!-- <Space> to toggle between 3 and 4 Placeholders -->
+	if (key == 32) { maxNrOfPlaces = (maxNrOfPlaces == 4) ? 3 : 4 }
+
+	<!-- '0' to increase the nr of Placeholders, with wrap around -->
+	if (key == 48) { maxNrOfPlaces = (maxNrOfPlaces >= 6) ? 2 : maxNrOfPlaces+1 }
+
+	<!-- '-' (or '_') to decrease the nr of Placeholders, with hard stop at min -->
+	if (key == 45 | key == 95) { maxNrOfPlaces = (maxNrOfPlaces > 2) ? maxNrOfPlaces-1 : maxNrOfPlaces }
+
+	<!-- '+' (or '=') to increase the nr of Placeholders, with hard stop at max -->
+	if (key == 43 | key == 61) { maxNrOfPlaces = (maxNrOfPlaces < 6) ? maxNrOfPlaces+1 : maxNrOfPlaces }
+
+	<!-- '1', '2', '3' ... '9' to select the nr of available Rhythms -->
+	if (key >= 49 & key <= 48+maxNrOfRhythms) { nrOfRhythms = key-48 }
+
+	<!-- '<' (or ',') to decrease the nr of Rhythms, with hard stop at min -->
+	if (key == 60 | key == 44) { nrOfRhythms = (nrOfRhythms > 1) ? nrOfRhythms-1 : nrOfRhythms }
+
+	<!-- '>' or '.' to increase the nr of Rhythms, with hard stop at max -->
+	if (key == 62 | key == 46) { nrOfRhythms = (nrOfRhythms < maxNrOfRhythms) ? nrOfRhythms+1 : nrOfRhythms }
+
+	if (debugOn >= 2) { document.getElementById("debuglog2").innerHTML = "2) userKey( '" + key + "' ) max#P " + maxNrOfPlaces + " max#R " + maxNrOfRhythms + " #R " + nrOfRhythms }
+
+	<!-- '?' to show help screen, otherwise redraw full board -->
+	if (key == 63) { drawHelp() } else { drawBoard() }
 }
 
 function userKeyInput( event )
 {
 	if (debugOn >= 6) { debugLog += " '" + event.keyCode + "'";	document.getElementById("debuglog").innerHTML = debugLog }
 
-	<!-- <Enter> or <Ctrl+Z>  to clear the screen -->
-	if (event.keyCode == 13 | event.keyCode == 26) { boardPlace = []; selectedRhythm = 0 }
-
-	<!-- <Space> to toggle between 3 and 4 Placeholders -->
-	if (event.keyCode == 32) { maxNrOfPlaces = (maxNrOfPlaces == 4) ? 3 : 4 }
-
-	<!-- '0' to toggle through nr of Placeholders -->
-	if (event.keyCode == 48) { maxNrOfPlaces = (maxNrOfPlaces >= 6) ? 2 : maxNrOfPlaces+1 }
-
-	<!-- '1', '2', '3' ... '9' to select the nr of available Rhythms -->
-	if (event.keyCode >= 49 & event.keyCode <= 48+maxNrOfRhythms) { nrOfRhythms = event.keyCode-48 }
-
-
-	if (debugOn >= 3) { document.getElementById("debuglog3").innerHTML = "3) max#P " + maxNrOfPlaces + " max#R " + maxNrOfRhythms + " #R " + nrOfRhythms }
-
-	<!-- '?' to show help screen, otherwise redraw full board -->
-	if (event.keyCode == 63) { drawHelp() } else { drawBoard() }
+	userKey( event.keyCode );
 }
 
 function userInput( event )
@@ -237,21 +293,31 @@ function userInput( event )
 	var debugText = " X" + x + " Y" + y;
 	var group     = 0;
 	var index     = 0;
-//	var help      = 0;
-	var help      = ( y < clearEdge & x > (boardWidth/2 - 4*clearEdge) & x < (boardWidth/2 + 4*clearEdge) ) ? 1 : 0;
+	var key       = 0xFF;	<!-- 0xFF indicates normal operation, any other value represents a user input from keyboard -->
 
 	if (debugOn >= 1) { document.getElementById("debuglog").innerHTML = debugLog; }
 
-	if ( y < clearEdge & ( x < clearEdge | x > boardWidth-clearEdge ) )
+	<!-- Center of the topline (and key '?'): shows the help text until next key or click -->
+	if ( y < clearEdge            & x > (boardWidth/2     - 4*clearEdge) & x < (boardWidth/2     + 4*clearEdge) ) { key = 63 }
+
+	<!-- Far left/right of the center of the top half (and key '-'/'+'): decrease/increase Placeholders -->
+	if ( x < clearEdge            & y > (boardHeight*0.25 - 2*clearEdge) & y < (boardHeight*0.25 + 2*clearEdge) ) { key = 45 }
+	if ( x > boardWidth-clearEdge & y > (boardHeight*0.25 - 2*clearEdge) & y < (boardHeight*0.25 + 2*clearEdge) ) { key = 43 }
+
+	<!-- Far left/right of the center of the bottom half (and key '<'/'>'): decrease/increase Rhythms -->
+	if ( x < clearEdge            & y > (boardHeight*0.75 - 2*clearEdge) & y < (boardHeight*0.75 + 2*clearEdge) ) { key = 60 }
+	if ( x > boardWidth-clearEdge & y > (boardHeight*0.75 - 2*clearEdge) & y < (boardHeight*0.75 + 2*clearEdge) ) { key = 62 }
+
+	if ( key != 0xFF )
+	{
+		debugText += " (click2key '" + key + "') "
+	}
+	else if ( y < clearEdge & ( x < clearEdge | x > boardWidth-clearEdge ) )
 	{									<!-- Both top corners of the screen mean "Clear Screen"  -->
 		selectedRhythm = 0;
 		group          = 0;
 		boardPlace     = [];
 	}
-//	if ( y < clearEdge & x > (boardWidth/2 - 4*clearEdge) & x < (boardWidth/2 - 4*clearEdge) ) ? 1 : 0;
-//	{
-//		help = 1;
-//	}
 	else if ( y < boardDivider )		<!-- Upper part of the screen, select one of the Places  -->
 	{
 		selectedPlace  = 0 ; 
@@ -283,11 +349,11 @@ function userInput( event )
 		selectedRhythm = index
 	}
 	
-	debugText += " G" + group + " I" + index + " P" + selectedPlace + " R" + selectedRhythm;
+	debugText += " G" + group + " I" + index + " P" + selectedPlace + " R" + selectedRhythm + " key '" + key + "'"
+	debugText += " boardPlace[] " + boardPlace;
 	if (debugOn >= 1) { document.getElementById("debuglog1").innerHTML = "1) userInput() " + debugText; }
-	if (debugOn >= 2) { document.getElementById("debuglog2").innerHTML = "2) boardPlace " + boardPlace; }
 
-	if ( help == 1 ) { drawHelp() } else { drawBoard() }
+	if ( key != 0xFF ) { userKey( key ) } else { drawBoard() }
 }
 
 </script>
@@ -301,7 +367,7 @@ function userInput( event )
 <p id="debuglog7"></p>
 <p id="debuglog"></p>
 
-<address>"Ritme Maker" by Anouk Zwanenberg - HTML programming by Ric Zwanenberg (April 2024; v240407a)</address>
+<address>"Ritme Maker" by Anouk Zwanenberg - HTML programming by Ric Zwanenberg (April 2024; v240410a)</address>
 
 </body>
 </html>
