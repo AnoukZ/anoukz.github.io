@@ -11,6 +11,8 @@
 	</style>
 </head>
 
+<small><i>"Ritme Maker" (April 2024; v240412b)</i></small>
+
 
 <body>
 <!-- Define create and display image/canvas (png images must be in same directory as this html) -->
@@ -213,18 +215,19 @@ function drawHelp ()
 	ctx.font      = fontSmall;
 	ctx.fillStyle = "black";  ctx.textAlign = "center";  ctx.textBaseline = "middle";
 
-	ctx.fillText( "Selecteer hieronder een ritme, klik daarna op een vak hierboven",       boardWidth/2, boardDivider-30 );
-	ctx.fillText( "Klik op een 'X' of druk op <Enter> om het bord te wissen",              boardWidth/2, boardDivider-10 );
-	ctx.fillText( "Druk op <Spatie> om 3 of 4 vakken te kiezen, of '0' voor meer keuzes",  boardWidth/2, boardDivider+10 );
-	ctx.fillText( "Druk op '1', '2', '3', … '9' om het aantal ritme keuzes weer te geven", boardWidth/2, boardDivider+30 );
-	ctx.fillText( "\"Ritme Maker\" (April 2024; v240412a)",                                boardWidth/2, boardDivider+60 );
+	ctx.fillText( "Selecteer hieronder een ritme, klik daarna op een vak hierboven",       boardWidth/2, boardDivider-40 );
+	ctx.fillText( "Klik op een 'X' of druk op <Enter> om het bord te wissen",              boardWidth/2, boardDivider-20 );
+	ctx.fillText( "Klik '<' or '>' om minder/meer vakken of ritmes te krijgen",            boardWidth/2, boardDivider+00 );
+	ctx.fillText( "Druk op <Spatie> om 3 of 4 vakken te kiezen, of '0' voor meer keuzes",  boardWidth/2, boardDivider+20 );
+	ctx.fillText( "Druk op '1', '2', '3', … '9' om het aantal ritme keuzes weer te geven", boardWidth/2, boardDivider+40 );
 
 //	ctx.fillText( "Select a rhythm below, then click a position above",                    boardWidth/2, boardDivider-40 );
 //	ctx.fillText( "Click an 'X' or press <Enter> to erase the board",                      boardWidth/2, boardDivider-20 );
 //	ctx.fillText( "Click '<' or '>' to decrease or increase positions or rhythms",         boardWidth/2, boardDivider+00 );
 //	ctx.fillText( "Press <Space> to toggle 3 / 4 positions, or '0' for more options",      boardWidth/2, boardDivider+20 );
 //	ctx.fillText( "Press '1', '2', '3', … '9' to select the number of rhythms below",      boardWidth/2, boardDivider+40 );
-//	ctx.fillText( "\"Ritme Maker\" (April 2024; v240412a)",                                boardWidth/2, boardDivider+60 );
+
+	ctx.fillText( "\"Ritme Maker\" (April 2024; v240412b)",                                          boardWidth/2, boardDivider+60 );
 
 	ctx.font         = fontMedium;
 //	ctx.fillStyle    = "whitesmoke";
@@ -369,7 +372,7 @@ function userInput( event )
 <p id="debuglog7"></p>
 <p id="debuglog"></p>
 
-<!-- <address>"Ritme Maker" by Anouk Zwanenberg - HTML programming by Ric Zwanenberg (April 2024; v240412a)</address> -->
+<!-- <address>"Ritme Maker" by Anouk Zwanenberg - HTML programming by Ric Zwanenberg (April 2024)</address> -->
 
 </body>
 </html>
