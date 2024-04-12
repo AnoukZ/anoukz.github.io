@@ -25,6 +25,7 @@
 <img    id="RitmeImage07"  width=0 height=0  src="Ritme07.png"  alt="Ritme07.png missing">
 <img    id="RitmeImage08"  width=0 height=0  src="Ritme08.png"  alt="Ritme08.png missing">
 <img    id="RitmeImage09"  width=0 height=0  src="Ritme09.png"  alt="Ritme09.png missing">
+<img    id="RitmeImage10"  width=0 height=0  src="Ritme10.png"  alt="Ritme10.png missing">
 
 <canvas id="myCanvas" width=900 height= 450 onclick="userInput(event)" tabindex=0 onkeypress="userKeyInput(event)">
         Sorry, your browser does not support the HTML5 canvas tag.
@@ -108,8 +109,8 @@ function drawBoard ()
 	var ctx   = myCanvas.getContext("2d");
 	var width = 0;
 
-	myCanvas.width  = window.innerWidth  - clearEdge;
-	myCanvas.height = window.innerHeight - clearEdge*4;
+	myCanvas.width  = window.innerWidth  - clearEdge;		<!-- Leave room on the side   to clear the scrollbar -->
+	myCanvas.height = window.innerHeight - clearEdge*3;		<!-- Leave room at the bottom to clear the scrollbar -->
 
 	boardWidth      = myCanvas.width;		<!-- original horizontal resolution of the background image -->
 	boardHeight     = myCanvas.height;		<!-- original vertical   resolution of the background image -->
@@ -162,7 +163,7 @@ function drawBoard ()
 		if ( boardPlace[i] > 0 & boardPlace[i] <= nrOfRhythms )
 		{
 			x = i * width + (width - rhythmWidth) / 2 ;
-			ctx.drawImage( document.getElementById("RitmeImage0"+boardPlace[i]), x, yOffset );
+			ctx.drawImage( document.getElementById("RitmeImage"+((boardPlace[i]>9)?"":"0")+boardPlace[i]), x, yOffset );
 		}
 	}
 	
@@ -190,7 +191,7 @@ function drawBoard ()
 
 		<!-- Draw the correct Rhythm image in the above drawn rectangle       -->
 		x = i * width + (width - rhythmWidth) / 2 ;
-		ctx.drawImage( document.getElementById("RitmeImage0"+(i+1)), x, boardDivider+yOffset );
+		ctx.drawImage( document.getElementById("RitmeImage"+((i>=9)?"":"0")+(i+1)), x, boardDivider+yOffset );
 	}
 
 	ctx.restore();	<!-- Restore previous context settings, as they where saved at the beginning of this function -->
@@ -212,16 +213,18 @@ function drawHelp ()
 	ctx.font      = fontSmall;
 	ctx.fillStyle = "black";  ctx.textAlign = "center";  ctx.textBaseline = "middle";
 
-//	ctx.fillText( "Selecteer hieronder een ritme, klik daarna op een vak hierboven",       boardWidth/2, boardDivider-30 );
-//	ctx.fillText( "Klik op een 'X' of druk op <Enter> om het bord te wissen",              boardWidth/2, boardDivider-10 );
-//	ctx.fillText( "Druk op <Spatie> om 3 of 4 vakken te kiezen, of '0' voor meer keuzes",  boardWidth/2, boardDivider+10 );
-//	ctx.fillText( "Druk op '1', '2', '3', … '9' om het aantal ritme keuzes weer te geven", boardWidth/2, boardDivider+30 );
+	ctx.fillText( "Selecteer hieronder een ritme, klik daarna op een vak hierboven",       boardWidth/2, boardDivider-30 );
+	ctx.fillText( "Klik op een 'X' of druk op <Enter> om het bord te wissen",              boardWidth/2, boardDivider-10 );
+	ctx.fillText( "Druk op <Spatie> om 3 of 4 vakken te kiezen, of '0' voor meer keuzes",  boardWidth/2, boardDivider+10 );
+	ctx.fillText( "Druk op '1', '2', '3', … '9' om het aantal ritme keuzes weer te geven", boardWidth/2, boardDivider+30 );
+	ctx.fillText( "\"Ritme Maker\" (April 2024; v240412a)",                                boardWidth/2, boardDivider+60 );
 
-	ctx.fillText( "Select a rhythm below, then click a position above",               boardWidth/2, boardDivider-40 );
-	ctx.fillText( "Click an 'X' or press <Enter> to erase the board",                 boardWidth/2, boardDivider-20 );
-	ctx.fillText( "Click '<' or '>' to decrease or increase positions or rhythms",    boardWidth/2, boardDivider+00 );
-	ctx.fillText( "Press <Space> to toggle 3 / 4 positions, or '0' for more options", boardWidth/2, boardDivider+20 );
-	ctx.fillText( "Press '1', '2', '3', … '9' to select the number of rhythms below", boardWidth/2, boardDivider+40 );
+//	ctx.fillText( "Select a rhythm below, then click a position above",                    boardWidth/2, boardDivider-40 );
+//	ctx.fillText( "Click an 'X' or press <Enter> to erase the board",                      boardWidth/2, boardDivider-20 );
+//	ctx.fillText( "Click '<' or '>' to decrease or increase positions or rhythms",         boardWidth/2, boardDivider+00 );
+//	ctx.fillText( "Press <Space> to toggle 3 / 4 positions, or '0' for more options",      boardWidth/2, boardDivider+20 );
+//	ctx.fillText( "Press '1', '2', '3', … '9' to select the number of rhythms below",      boardWidth/2, boardDivider+40 );
+//	ctx.fillText( "\"Ritme Maker\" (April 2024; v240412a)",                                boardWidth/2, boardDivider+60 );
 
 	ctx.font         = fontMedium;
 //	ctx.fillStyle    = "whitesmoke";
@@ -366,7 +369,7 @@ function userInput( event )
 <p id="debuglog7"></p>
 <p id="debuglog"></p>
 
-<address>"Ritme Maker" by Anouk Zwanenberg - HTML programming by Ric Zwanenberg (April 2024; v240410b)</address>
+<!-- <address>"Ritme Maker" by Anouk Zwanenberg - HTML programming by Ric Zwanenberg (April 2024; v240412a)</address> -->
 
 </body>
 </html>
