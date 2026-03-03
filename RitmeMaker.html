@@ -267,7 +267,7 @@ function userKey( key )
 	if (key == 45 | key == 95) { maxNrOfPlaces = (maxNrOfPlaces > 2) ? maxNrOfPlaces-1 : maxNrOfPlaces }
 
 	<!-- '+' (or '=') to increase the nr of Placeholders, with hard stop at max -->
-	if (key == 43 | key == 61) { maxNrOfPlaces = (maxNrOfPlaces < 6) ? maxNrOfPlaces+1 : maxNrOfPlaces }
+	if (key == 43 | key == 61) { maxNrOfPlaces = (maxNrOfPlaces < 8) ? maxNrOfPlaces+1 : maxNrOfPlaces }
 
 	<!-- '1', '2', '3' ... '9' to select the nr of available Rhythms -->
 	if (key >= 49 & key <= 48+maxNrOfRhythms) { nrOfRhythms = key-48 }
