@@ -60,7 +60,7 @@ var boardPlace      = [];
 
 var maxNrOfPlaces   = 4;		<!-- Max number of placeholders "Places"        -->
 var maxNrOfRhythms  = 9;		<!-- Max number of displayable "Rhythms"        -->
-var nrOfRhythms     = 3;		<!-- Number of displayed/selectable "Rhythms"   -->
+var nrOfRhythms     = 2;		<!-- Number of displayed/selectable "Rhythms"   -->
 
 var selectedPlace   = 0;		<!-- Indicates the Placeholder that is selected -->
 var selectedRhythm  = 0;		<!-- Indicates the Rhythm that is selected      -->
@@ -261,7 +261,7 @@ function userKey( key )
 	if (key == 32) { maxNrOfPlaces = (maxNrOfPlaces == 4) ? 3 : 4 }
 
 	<!-- '0' to increase the nr of Placeholders, with wrap around -->
-	if (key == 48) { maxNrOfPlaces = (maxNrOfPlaces >= 6) ? 2 : maxNrOfPlaces+1 }
+	if (key == 48) { maxNrOfPlaces = (maxNrOfPlaces >= 8) ? 2 : maxNrOfPlaces+1 }
 
 	<!-- '-' (or '_') to decrease the nr of Placeholders, with hard stop at min -->
 	if (key == 45 | key == 95) { maxNrOfPlaces = (maxNrOfPlaces > 2) ? maxNrOfPlaces-1 : maxNrOfPlaces }
