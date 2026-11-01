@@ -9,12 +9,26 @@
 		body    { color: white; background-color: black; margin: 0 }
 		img     { display: none }
 		canvas  { display: block; margin: 0 auto;
-		          max-width: 100%; max-height: 100vh; max-height: 100dvh; // Schaalt mee met het scherm, verhouding blijft gelijk
-		          touch-action: manipulation;                             // Geen zoom bij dubbeltikken (herstart = 2x tikken)
+		          max-width: 100%; max-height: 100vh; max-height: 100dvh; /* Scales along with the screen, aspect ratio stays the same */
+		          touch-action: manipulation;                             /* No page zoom on double tap (switching variant needs two taps) */
 		          -webkit-tap-highlight-color: transparent; outline: none }
 		p, address { margin-left: 8px; margin-right: 8px }
-		svg     { color: red;   background-color: transparent }
-		address { margin-top: 1em; padding-top: 1em; border-top: thin dotted }
+		/* The dialog is sized in board pixels: 1 board pixel = var(--s) screen pixels (set by updateDialogScale), so it scales with the board */
+		dialog              { --s: 0.5; padding: 0; background: #111; color: white; font-family: sans-serif; text-align: center; overflow: auto;
+		                      border: max(1px, calc(3px * var(--s))) solid #999; border-radius: calc(14px * var(--s)) }
+		dialog:not([open])  { display: none } /* Browsers without <dialog> support would otherwise show it permanently */
+		dialog::backdrop    { background: rgba(0, 0, 0, 0.75) }
+		dialog .box         { display: flex; flex-direction: column; align-items: center; gap: calc(12px * var(--s)); padding: calc(20px * var(--s)) calc(24px * var(--s)) }
+		dialog h2           { margin: 0; font-size: calc(36px * var(--s)) }
+		dialog p            { margin: 0 }
+		dialog .or          { font-size: calc(20px * var(--s)) }
+		dialog .hint        { margin-top: calc(6px * var(--s)); font-size: calc(16px * var(--s)); color: #bbb }
+		dialog button       { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0; margin: 0;
+		                      width: calc(200px * var(--s)); height: calc(75px * var(--s)); line-height: 1.1;
+		                      font: inherit; color: white; background: #2a2a2a; cursor: pointer;
+		                      border: max(1px, calc(3px * var(--s))) solid #aaa; border-radius: calc(10px * var(--s)) }
+		dialog button .main { font-size: calc(32px * var(--s)); font-weight: bold; line-height: 1.1 }
+		dialog button .sub  { font-size: calc(20px * var(--s)); line-height: 1.1 }
 	</style>
 </head>
 
@@ -33,7 +47,7 @@
 <!-- 2) bonus actions for v2 blue/green/pink                -->
 <!-- 3) undo bonus actions for pink if digit too low (done) -->
 <!--                                                        -->
-<!-- 7) instruction for usage (not game rules)              -->
+<!-- 7) instruction for usage (not game rules)               -->
 <!-- 8) use of defines in code for improved readability     -->
 <!------------------------------------------------------------>
 
@@ -45,6 +59,7 @@
 <!--  ctrl-Z  Undo previous move                            -->
 <!--  ctrl-Y  Redo previous move                            -->
 <!--  Z       Debug mode, shows tapzones overlay            -->
+<!--  H or ?  Open the new game window                       -->
 <!------------------------------------------------------------>
 
 
@@ -834,6 +849,41 @@ function markItem( group, index, value, source ) {
 }
 
 
+// Dialog to start a new game: choose the board variant, or continue the current game
+var dialogMinScale = 0.6;    // Smallest dialog scale (screen pixels per board pixel): keeps the buttons at least 120 x 45 when the board is shown small. 0 = scale exactly with the board
+var dialogHooked   = false;  // True once the dialog follows window resizes
+
+// Make the dialog as large as it would be on the board: 1 board pixel = s screen pixels
+function updateDialogScale () {
+	var rect = myCanvas.getBoundingClientRect();
+
+	if (rect.width > 0) { document.getElementById("startDialog").style.setProperty( "--s", Math.max( rect.width / myCanvas.width, dialogMinScale ) ) }
+}
+
+function openStartDialog () {
+	var dlg = document.getElementById("startDialog");
+
+	if (dlg.open) { return }
+
+	updateDialogScale();
+	if (!dialogHooked) { window.addEventListener( "resize", updateDialogScale ); dialogHooked = true }
+
+	if (dlg.showModal) { dlg.showModal() } else { dlg.setAttribute("open", "") }
+}
+
+function closeStartDialog () {
+	var dlg = document.getElementById("startDialog");
+	if (dlg.close) { dlg.close() } else { dlg.removeAttribute("open") }
+}
+
+// Start a new game with the selected variant (choosing a variant in the dialog is the confirmation)
+function startGame ( variant ) {
+	closeStartDialog();
+	boardVariant = variant;
+	userHistory( 0 );
+}
+
+
 function userKeyInput( event ) {
 	var key  = (event.key || "").toLowerCase();
 	var ctrl = event.ctrlKey || event.metaKey;
@@ -847,6 +897,7 @@ function userKeyInput( event ) {
 		if (key == "1") { if (confirmAction("variant1")) { boardVariant = 1; userHistory(0) } else { startCounter = 1 } } // 2x '1' = Start variant 1
 		if (key == "2") { if (confirmAction("variant2")) { boardVariant = 2; userHistory(0) } else { startCounter = 1 } } // 2x '2' = Start variant 2
 		if (key == "z") { debugZones = debugZones ? 0 : 1; updateZoneOverlay() }                                          // 'z' = Show/hide tap zones
+		if (key == "h" || key == "?") { openStartDialog() }                                                               // 'h'|'?' = New game window
 		if (key == "r") { userHistory( 999 ) }                                                                            // 'r'|'R' = Rotate
 	}
 }
@@ -883,7 +934,7 @@ var HITZONES = [
 	{ action: "variant", rect: [ boardWidth - 32, boardHeight - 32, boardWidth, boardHeight ] }, // RightBottom: change variant (doubletap after gamestart)
 	{ action: "rotate",  rect: [ -Infinity, -Infinity, 33, 33 ] },                               // LeftTop corner: rotate board
 	{ action: "rotate",  rect: [ boardWidth - 32, -Infinity, boardWidth, 33 ] },                 // RightTop corner: rotate board
-	{ action: "restart", rect: [ -Infinity, -Infinity, X_BUTTONS, 130 ] },                       // Restart: (intentionaly invisible, doubletap)
+	{ action: "restart", rect: [ -Infinity, -Infinity, X_BUTTONS, 130 ] },                       // Restart button: opens the new game window
 	{ action: "undo",    rect: [ -Infinity, 130, X_BUTTONS, 265 ] },
 	{ action: "redo",    rect: [ -Infinity, 265, X_BUTTONS, Y_CONTROLS ] },
 
@@ -1065,7 +1116,7 @@ function userInput( event ) {
 	{
 		if      (hit.action == "variant") { if (historyList.length <= 1 || confirmAction("variant")) { boardVariant = (boardVariant == 1) ? 2 : 1; userHistory( 0 ) } } // Hidden feature to toggle board variant 1/2 (double confirm if the game started)
 		else if (hit.action == "rotate")  { userHistory( 999 ) }                                  // Hidden feature to toggle the rotation of the board
-		else if (hit.action == "restart") { if (confirmAction("restart")) { userHistory(0) } }    // Restart (double confirm, intentionally invisible)
+		else if (hit.action == "restart") { openStartDialog() }                                    // Restart button: open the new game window
 		else if (hit.action == "undo")    { userHistory( -1 ) }
 		else if (hit.action == "redo")    { userHistory( +1 ) }
 		else { group = hit.group; index = hit.index; value = hit.value }
@@ -1094,7 +1145,18 @@ function userInput( event ) {
 <p id="debuglog7"></p>
 <p id="debuglog"></p>
 
-<address style="text-align: center;">"Clever" by Wolfgang Warsch - 999 Games - HTML programming by Ric Zwanenberg (December 2020; v261030a)</address>
+<dialog id="startDialog" aria-labelledby="startTitle" onclick="if (event.target == this) { closeStartDialog() }" onclose="myCanvas.focus()">
+<div class="box">
+  <h2 id="startTitle">New game</h2>
+  <button id="startVariant1" type="button" onclick="startGame( 1 )"><span class="main">Clever</span></button>
+  <button id="startVariant2" type="button" onclick="startGame( 2 )"><span class="sub">Twice as</span><span class="main">Clever</span></button>
+  <p class="or">or</p>
+  <button id="startContinue" type="button" onclick="closeStartDialog()" autofocus><span class="main">Continue</span><span class="sub">current game</span></button>
+  <p class="hint">Hint: Press &lsquo;R&rsquo; to rotate board</p>
+</div>
+</dialog>
+
+<address style="text-align: center;"> "Clever" by Wolfgang Warsch - 999 Games - HTML programming by Ric Zwanenberg (December 2020; v261101.7b)</address>
 
 </body>
 </html>
