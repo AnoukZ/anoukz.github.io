@@ -10,9 +10,14 @@
 		img     { display: none }
 		canvas  { display: block; margin: 0 auto;
 		          max-width: 100%; max-height: 100vh; max-height: 100dvh; /* Scales along with the screen, aspect ratio stays the same */
-		          touch-action: manipulation;                             /* No page zoom on double tap (switching variant needs two taps) */
+		          touch-action: manipulation;                             /* No page zoom on double tap */
 		          -webkit-tap-highlight-color: transparent; outline: none }
 		p, address { margin-left: 8px; margin-right: 8px }
+		.sr-only   { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap } /* For screen readers only */
+		#debugLog  { display: none; margin: 1em 8px; color: #aaa; font-size: 12px; white-space: pre-wrap; word-break: break-all }  /* Debug messages, see log() */
+		#imageError { display: none; margin: 1em 8px; color: #f66; font-family: sans-serif; font-size: 18px } /* Shown instead of the board when no board image can be loaded */
+		dialog .error      { color: #f66; font-size: calc(15px * var(--s)); line-height: 1.2; max-width: calc(200px * var(--s)); text-align: left } /* A board image is missing */
+		dialog .error:empty { display: none }
 		/* The dialog is sized in board pixels: 1 board pixel = var(--s) screen pixels (set by updateDialogScale), so it scales with the board */
 		dialog              { --s: 0.5; padding: 0; background: #111; color: white; font-family: sans-serif; text-align: center; overflow: auto;
 		                      border: max(1px, calc(3px * var(--s))) solid #999; border-radius: calc(14px * var(--s)) }
@@ -21,7 +26,7 @@
 		dialog .box         { display: flex; flex-direction: column; align-items: center; gap: calc(12px * var(--s)); padding: calc(20px * var(--s)) calc(24px * var(--s)) }
 		dialog h2           { margin: 0; font-size: calc(36px * var(--s)) }
 		dialog p            { margin: 0 }
-		dialog .or          { font-size: calc(20px * var(--s)) }
+		dialog .altcolor    { font-size: calc(16px * var(--s)); line-height: 0.8; display: inline-flex; align-items: center; gap: 0.4em; }
 		dialog .hint        { margin-top: calc(6px * var(--s)); font-size: calc(16px * var(--s)); color: #bbb }
 		dialog button       { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0; margin: 0;
 		                      width: calc(200px * var(--s)); height: calc(75px * var(--s)); line-height: 1.1;
@@ -36,37 +41,50 @@
 <body>
 
 <!-- Define create and display image canvas -->
-<img    id="CleverImage1" width=   0 height=   0 src="Clever1.png" alt="Clever1.png missing">
-<img    id="CleverImage2" width=   0 height=   0 src="Clever2.png" alt="Clever2.png missing">
-<canvas id="myCanvas"     width=1020 height=1420 onclick="userInput(event)" tabindex=0 onkeydown="userKeyInput(event)">
+<img    id="CleverImage1"  width=   0 height=   0 src="Clever1.png"  alt="Clever1.png missing">
+<img    id="CleverImage2"  width=   0 height=   0 src="Clever2.png"  alt="Clever2.png missing">
+<img    id="CleverImage2a" width=   0 height=   0 src="Clever2a.png" alt="Clever2a.png missing">
+<canvas id="myCanvas"      width=1460 height=2060 tabindex=0 aria-label="Clever Score Sheet">
         Sorry, your browser does not support the HTML5 canvas tag.
 </canvas>
+<p id="imageError"></p>
+<p id="scoreText" class="sr-only" role="status"></p>
 
 <!------------------------------------------------------------>
 <!-- ToDo & Wishlist:                                       -->
 <!-- 2) bonus actions for v2 blue/green/pink                -->
 <!-- 3) undo bonus actions for pink if digit too low (done) -->
 <!--                                                        -->
-<!-- 7) instruction for usage (not game rules)               -->
+<!-- 7) instruction for usage (not game rules)              -->
 <!-- 8) use of defines in code for improved readability     -->
 <!------------------------------------------------------------>
 
 <!------------------------------------------------------------>
 <!-- Keyboard shortcuts during game play:                   -->
-<!--  1/1     Select board variant 1 (double tap)           -->
-<!--  2/2     Select board variant 2 (double tap)           -->
-<!--  R       Rotate, switch portrait/landscape             -->
+<!--  1/1     Select board variant 1 (press twice)          -->
+<!--  2/2     Select board variant 2 (press twice)          -->
+<!--  R       Rotate (auto on a landscape screen)           -->
 <!--  ctrl-Z  Undo previous move                            -->
 <!--  ctrl-Y  Redo previous move                            -->
 <!--  Z       Debug mode, shows tapzones overlay            -->
-<!--  H or ?  Open the new game window                       -->
+<!--  H or ?  Open the new game window                      -->
+<!------------------------------------------------------------>
+
+<!------------------------------------------------------------>
+<!-- Options behind the web address:                        -->
+<!--  ?zones   Show the tap zones over the board            -->
+<!--  ?nosave  Don't save or resume the game                -->
+<!--  ?debug   Debug logging (?debug=3: levels 1 to 3 only) -->
+<!--  ?test    Only for the tests in clever-tests           -->
 <!------------------------------------------------------------>
 
 
 <script>
-// Two Clever variants are available: 1 = Original, 2 = "Dobbel zo Clever"
-var boardVariant   = 1;
-var CleverImage    = "CleverImage" + boardVariant;     // Select image depending on the variant
+(function () { // Everything below lives inside this function: no global variables. The tests reach it through cleverEval (see ?test)
+
+var boardVariant   = 1;                                // Two Clever variants are available: 1 = Original, 2 = "Dobbel zo Clever"
+var colorVariant   = false;                            // False means real game colors, True means only use colors from the Original
+var CleverImage    = "CleverImage" + boardVariant      // Select image depending on the board variant, after startDialog the colorVariant can be appended
 
 var boardWidth     = myCanvas.width;                   // original horizontal resolution of the background image
 var boardHeight    = myCanvas.height;                  // original vertical   resolution of the background image
@@ -74,74 +92,280 @@ var boardHeight    = myCanvas.height;                  // original vertical   re
 var fontLarge      = "italic bold 60px Comic Sans MS"; // Font for digits (60px) and for socre (30px)
 var fontSmall      = "italic bold 30px Comic Sans MS"; // Font for digits (60px) and for socre (30px)
 
-var boardSettingsRotate = 0;   // Board rotation (0: Portrait, 1: Landscape counterclockwise)
-var boardSettingsScale  = 0;
+var boardSettingsRotate = 0;       // Board rotation (0: Portrait, 1: Landscape counterclockwise)
 
-var debugOn         = 0;       // Activates all debug logging, 0: logging OFF, x: level 'x' logging ON
-var debugLog        = "Info:"; // Used for debug logging only
-var debugZones      = 0;       // 1: draw all tap zones over the board (also: key Z, or ?zones behind the URL)
+var VERSION        = "v261107.9d"; // Shown at the bottom of the page: change it here only
+
+var debugOn        = 0;            // Activates all debug logging, 0: logging OFF, x: level 'x' logging ON (also: ?debug or ?debug=3 behind the URL)
+var debugLines     = { info: "" }; // Debug messages, see log()
+var debugZones     = 0;            // 1: draw all tap zones over the board (also: key Z, or ?zones behind the URL)
+
+// Options behind the web address
+var urlOptions = (window.location && window.location.search) || "";
+var urlDebug   = /[?&]debug(?:=(\d+))?(?:&|$)/.exec( urlOptions );
+if (urlDebug) { debugOn = urlDebug[1] ? +urlDebug[1] : 7 }
+if (urlDebug || /[?&]test(?:&|$)/.test( urlOptions )) { window.cleverEval = function ( code ) { return eval( code ) } } // Hook for the tests in clever-tests: runs code inside this script
+
+// Behaviour switches
+var autoRotate     = 1;      // 1 = turn the board automatically on a landscape screen, 0 = only on request (R key or corner)
+var autoSave       = 1;      // 1 = keep the game in the browser and resume it after a reload, 0 = off (also: ?nosave behind the URL)
+var keepAwake      = 1;      // 1 = ask the browser to keep the screen on while playing (only where the browser supports it)
+var awakeMinutes   = 30;     // ...and let go again after this many minutes without a tap, to spare the battery
+
+// State belonging to the switches above
+var boardReady     = true;   // False while the board image is missing: the game can't be shown or played
+var screenLandscape       = false; // Orientation of the screen; a nearly square window keeps the previous orientation
+var rotateManual          = null;  // Rotation (0/1) chosen by the user with R or a corner; null = automatic. Lasts until the screen is turned
+var rotateManualLandscape = false; // Orientation of the screen at the moment the user made that choice
+var saveKey        = "cleverGame";
+var wakeLock       = null;   // The screen wake lock, while we hold one
+var wakePending    = false;  // True while a wake lock request is on its way
+var wakeWanted     = false;  // True from the first tap until the screen has been idle for awakeMinutes
+var wakeTimer      = null;
 
 
 // Boards use index 0 to indicate where the next marker should be drawn
 // The first few  boards are for game control and generic to all variants
-var boardRound      = [];
-var boardReTake     = []; // Variant 2 "Dobbel zo Clever" only
-var boardReRoll     = [];
-var boardPlusOne    = [];
+var boardRound     = [];
+var boardReTake    = []; // "Dobbel zo Clever" variant only
+var boardReRoll    = [];
+var boardPlusOne   = [];
 
 // The below first set of colored boards are for "Clever Original" variant only
-var board1Yellow    = [];
-var board1Blue      = [];
-var board1Green     = [];
-var board1Orange    = [];
-var board1Purple    = [];
+var board1Yellow   = [];
+var board1Blue     = [];
+var board1Green    = [];
+var board1Orange   = [];
+var board1Purple   = [];
 
 // The below second set of colored boards are for "Dobbel zo Clever" variant only
-var board2Silver    = [];
-var board2Yellow    = [];
-var board2Blue      = [];
-var board2Green     = [];
-var board2Pink      = [];
+var board2Silver   = [];
+var board2Yellow   = [];
+var board2Blue     = [];
+var board2Green    = [];
+var board2Pink     = [];
 
 // boardBonus keeps track of whether or not a bonus action is used (0: unused, 1: used)
-var boardBonus      = [];
+var boardBonus     = [];
 
 // List of accumulated manual bonus actions (couples: group/value), use index 0 to indicate where the next entry should be stored
-var bonusList       = []; // Used to set/clear manual bonus action on yellow/blue/black "x" and black "6"
+var bonusList      = []; // Used to set/clear manual bonus action on yellow/blue/black "x" and black "6"
 
-// In order to avoid accidental push of start, user must click start twice for game to restart
-var startCounter    = 0;
-var pendingAction   = ""; // Welke actie wacht op bevestiging ("restart", "variant", "variant1", "variant2")
+// Keys 1 and 2 start a new game only when pressed twice, to avoid starting by accident
+var confirmName    = "";   // The action that has been asked for and waits for its second key press
+var confirmTime    = 0;    // When that was (ms)
+var confirmSeconds = 2;    // Time allowed between the two key presses
 
-// Variant 2, pink: minimaal cijfer dat nodig is voor de bonus van elk veld (index = veld; bonus = boardBonus[36+veld])
+// Variant 2, pink: minimal dice value required to get the bonus of each field (index = field; bonus = boardBonus[36+veld])
 var pinkBonusThreshold = [ 0, 0, 0, 2, 3, 4, 5, 6, 2, 3, 4, 5, 6 ];
-var pinkPlacedBy       = []; // Per pink-veld: "user" (zelf gezet) of "bonus" (automatisch geplaatst door een bonus)
+var pinkPlacedBy       = []; // Per pink-field: "user" (manual action) or "bonus" (automatic placement via a bonus)
 
 // List of historically choosen items (triplets: group/item/value), use index 0 to indicate where the next entry should be stored
-var historyList     = [ 1 ];
+var historyList    = [ 1 ];
 var historyLastDigit;
+
+
+// ---------------------------------------------------------------------------------------------------------------
+// Screen orientation: the board turns by itself on a landscape screen (R or a top corner turns it by hand)
+// ---------------------------------------------------------------------------------------------------------------
+function updateOrientation () {
+	if      (window.innerWidth  > window.innerHeight * 1.05) { screenLandscape = true }
+	else if (window.innerHeight > window.innerWidth  * 1.05) { screenLandscape = false }
+	return screenLandscape; // Within 5% of a square the previous orientation stays, so a window doesn't flip back and forth
+}
+
+// Rotation (0/1) that the board should have now
+function wantedRotation () {
+	updateOrientation();
+
+	if (rotateManual != null && rotateManualLandscape == screenLandscape) { return rotateManual } // The user's choice stands...
+	rotateManual = null;                                                                          // ...until the screen is turned
+
+	return autoRotate ? (screenLandscape ? 1 : 0) : boardSettingsRotate;
+}
+
+function onScreenResize () {
+	var r = wantedRotation();
+
+	if (r != boardSettingsRotate) { boardSettingsRotate = r; redrawGame() }
+}
+
+// Draw the board from scratch and play the game again until the current position
+function redrawGame () {
+	initGlobals(); drawBoard();
+	replayHistory( historyList[0] ); // Only till the current position, so that undone moves don't come back
+}
+
+
+// ---------------------------------------------------------------------------------------------------------------
+// Missing board image: show a message instead of a dead page
+// ---------------------------------------------------------------------------------------------------------------
+function imageOk ( imageName ) {
+	var img = document.getElementById( imageName );
+
+	return img.complete && img.naturalWidth > 0;
+}
+
+function imageMissingText ( imageName ) {
+	return "\u201C" + document.getElementById( imageName ).getAttribute("src") + "\u201D could not be loaded. Keep Clever .png files in the same folder as this web page.";
+}
+
+// No board image can be shown at all: message instead of the board
+function showImageError ( imageName ) {
+	var box = document.getElementById("imageError");
+
+	box.textContent = "The board image " + imageMissingText( imageName );
+	box.style.display      = "block";
+	myCanvas.style.display = "none";
+	boardReady = false;
+}
+
+function hideImageError () {
+	document.getElementById("imageError").style.display = "none";
+	myCanvas.style.display = "";
+	boardReady = true;
+}
+
+
+// ---------------------------------------------------------------------------------------------------------------
+// Saving the game: the game is rebuilt from its move history, so the history is all that has to be stored
+// ---------------------------------------------------------------------------------------------------------------
+function saveGame () {
+	if (!autoSave) { return }
+
+	try {
+		localStorage.setItem( saveKey, JSON.stringify( { format: 1, variant: boardVariant, color: colorVariant, rotate: rotateManual, landscape: rotateManualLandscape, history: historyList } ) );
+	} catch (e) { } // No storage available (private mode, full): the game just isn't saved
+}
+
+// A history is a list of triplets (group, index, value) behind one pointer; refuse anything that doesn't look like that
+function isValidHistory ( h ) {
+	var i;
+
+	if (!Array.isArray(h) || h.length < 1 || (h.length - 1) % 3 != 0) { return false }
+	if (!Number.isInteger(h[0]) || h[0] < 1 || h[0] > h.length || (h[0] - 1) % 3 != 0) { return false }
+
+	for ( i = 1; i < h.length; i += 3 )
+	{
+		if (!(Number.isInteger(h[i])   && h[i]   >= 1 && h[i]   <= 9 )) { return false } // group
+		if (!(Number.isInteger(h[i+1]) && h[i+1] >= 0 && h[i+1] <= 99)) { return false } // index
+		if (!(Number.isInteger(h[i+2]) && h[i+2] >= 0 && h[i+2] <= 9 )) { return false } // value
+	}
+	return true;
+}
+
+// Returns the saved game, or null when there is none (or when it can't be trusted)
+function loadGame () {
+	if (!autoSave) { return null }
+
+	try {
+		var s = JSON.parse( localStorage.getItem( saveKey ) );
+
+		if (s && s.format == 1 && (s.variant == 1 || s.variant == 2) && isValidHistory( s.history )) { return s }
+	} catch (e) { }
+
+	return null;
+}
+
+// Play back a game that was loaded with loadGame()
+function resumeGame () {
+	if (!boardReady) { return }
+
+	try { replayHistory( historyList[0] ) }
+	catch (e) // The saved game can't be played back: throw it away and start fresh
+	{
+		try { localStorage.removeItem( saveKey ) } catch (e2) { }
+		historyList = [ 1 ]; initGlobals(); drawBoard();
+	}
+
+	if (historyList.length > 1) { keepScreenOn() }
+}
+
+
+// ---------------------------------------------------------------------------------------------------------------
+// Keeping the screen on while playing (Screen Wake Lock API)
+// ---------------------------------------------------------------------------------------------------------------
+function keepScreenOn () { // Call this on every tap or key press
+	if (!keepAwake || !navigator.wakeLock) { return }
+
+	wakeWanted = true;
+	clearTimeout( wakeTimer );
+	wakeTimer = setTimeout( releaseScreen, awakeMinutes * 60 * 1000 );
+
+	requestWakeLock();
+}
+
+function requestWakeLock () {
+	if (!wakeWanted || wakeLock != null || wakePending || document.visibilityState != "visible") { return }
+
+	wakePending = true;
+	navigator.wakeLock.request( "screen" ).then( function ( lock ) {
+		wakePending = false;
+		wakeLock    = lock;
+		lock.addEventListener( "release", function () { wakeLock = null } ); // The browser lets go by itself when the page is hidden
+		if (!wakeWanted) { lock.release() }
+	} ).catch( function () { wakePending = false } ); // Refused (battery saver, no permission): we try again at the next tap
+}
+
+function releaseScreen () {
+	wakeWanted = false;
+	clearTimeout( wakeTimer );
+	if (wakeLock != null) { wakeLock.release() }
+}
 
 
 window.onload = function() {
 
-	if (debugOn >= 7)
+	log( 7, CleverImage + ","
+		   + " boardW:" + boardWidth + ",H:" + boardHeight + " window.innerW:" + window.innerWidth + ",H:" + window.innerHeight
+	       + " screen.availW:" + screen.availWidth + ",H:" + screen.availHeight   // minus taskbar
+	       + " screen.W:" + screen.width + ",H:" + screen.height );               // full physical screen
+
+	if (urlOptions.indexOf("zones")  >= 0) { debugZones = 1 }
+	if (urlOptions.indexOf("nosave") >= 0) { autoSave   = 0 }
+
+	var saved = loadGame();
+	if (saved)
 	{
-		debugLog += " boardW:"        + boardWidth        + ",H:" + boardHeight
-		debugLog += " window.innerW:" + window.innerWidth + ",H:" + window.innerHeight;
-		debugLog += " screen.availW:" + screen.availWidth + ",H:" + screen.availHeight; // minus taskbar
-		debugLog += " screen.W:"      + screen.width      + ",H:" + screen.height;      // full physical screen
+		boardVariant = saved.variant;
+		colorVariant = !!saved.color;
+    	CleverImage  = "CleverImage" + boardVariant; if (boardVariant > 1 && colorVariant) { CleverImage += "a" }
+		historyList  = saved.history;
+		rotateManual = (saved.rotate === 0 || saved.rotate === 1) ? saved.rotate : null;
+		rotateManualLandscape = !!saved.landscape;
+		
+		log( 7, " Saved:" + CleverImage);
 	}
+	
+	var notice = "";
+	if (!imageOk( CleverImage )) { notice = imageMissingText( CleverImage ) }
 
-	if (window.location && window.location.search.indexOf("zones") >= 0) { debugZones = 1 }
+	boardSettingsRotate = wantedRotation();
+	initGlobals(); drawBoard();
+	if (saved) { resumeGame() }
+	if (notice != "") { openStartDialog( notice ) }
 
-	initGlobals();
-	drawBoard();
+	document.getElementById("version").textContent = VERSION;
+	updateScoreText();
+
+	myCanvas.addEventListener( "click",   userInput );
+	myCanvas.addEventListener( "keydown", userKeyInput );
+
+	var dlg = document.getElementById("startDialog");
+	dlg.addEventListener( "click", function ( event ) { if (event.target == dlg) { closeStartDialog() } } ); // A tap on the dimmed background = continue
+	dlg.addEventListener( "close", function () { myCanvas.focus() } );
+	document.getElementById("startVariant1").addEventListener( "click", function () { startGame( 1, false ) } );
+	document.getElementById("startVariant2").addEventListener( "click", function () { startGame( 2, document.getElementById("colorVariant").checked ) } );
+	document.getElementById("startContinue").addEventListener( "click", closeStartDialog );
+
+	window.addEventListener( "resize", onScreenResize );
+	document.addEventListener( "visibilitychange", requestWakeLock );
 }
 
 
 function initGlobals () {
 	var i = 0;
-	
+
 	// Boards use index 0 to indicate where the next marker should be drawn, value -1 indicates an unused item
 	if (boardVariant == 1) 
 	{
@@ -170,7 +394,7 @@ function initGlobals () {
 		board2Pink   = [  1,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ];
 	} else
 	{
-		debugLog += " initGlobals() error variant " + boardVariant; document.getElementById("debuglog").innerHTML = debugLog;
+		log( 0, " initGlobals() error variant " + boardVariant );
 	}
 	
 	// boardBonus keeps track of whether or not a bonus action is used (0: unused, 1: used)
@@ -182,11 +406,10 @@ function initGlobals () {
 	bonusList    = [ 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ]; // Used to set/clear manual bonus actions
 
 	// To avoid accidental push of start, user must click start twice for game to restart
-	startCounter = 0;
-	pendingAction = "";
+	confirmName = "";
 	pinkPlacedBy = [];
 
-	if (debugOn >= 6) { debugLog += " initGlobals()"; document.getElementById("debuglog").innerHTML = debugLog; }
+	log( 6, " initGlobals()" );
 }
 
 
@@ -196,9 +419,10 @@ function drawBoard () {
 	var x = 0;
 	var y = 0;
 
-	if (debugOn >= 7) { debugLog += " drawBoard() myCanvas.Width:" + myCanvas.width + ",Height:" + myCanvas.height; }
+	log( 7, " drawBoard() myCanvas.Width:" + myCanvas.width + ",Height:" + myCanvas.height );
 
-	CleverImage = "CleverImage" + boardVariant; // Select image of the selected variant
+	if (!imageOk( CleverImage )) { showImageError( CleverImage ); return } // The board image is missing
+	hideImageError();
 
     // Scaling to the screen is done with CSS (see canvas rule in <style>); clicks are converted in userInput()
 
@@ -215,7 +439,7 @@ function drawBoard () {
 		ctx.rotate( -90 * Math.PI / 180);
 		x -= boardWidth;
 
-		if (debugOn >= 7) { debugLog += " myCanvas.Width:" + myCanvas.width + ",Height:" + myCanvas.height; }
+		log( 7, " myCanvas.Width:" + myCanvas.width + ",Height:" + myCanvas.height );
 	}
 	ctx.drawImage( document.getElementById(CleverImage), x, y );
 	ctx.restore();
@@ -226,7 +450,6 @@ function drawBoard () {
 	ctx.fillStyle = "red";
 	ctx.textAlign = "center";
 
-	if (debugOn >= 6) { document.getElementById("debuglog").innerHTML = debugLog; }
 }
 
 
@@ -240,16 +463,19 @@ function addHistory ( group, index, value ) {
 	historyList.push( group, index, value );
 	historyList[0] = historyList.length;
 
-	if (debugOn >= 6) { document.getElementById("debuglog6").innerHTML = "6) addHistory(G" + group + ",I" + index + ",V" + value + ") H" + historyList; }
+	log( 6, "6) addHistory(G" + group + ",I" + index + ",V" + value + ") H" + historyList, 6 );
 }
 
 
 // Replays all of the actions from the history list, from start till 'end' position ((excluding the end itself)
 function replayHistory ( end ) {
 	var i;
+
+	if (!boardReady) { return }
+
 	for ( i = 1; i < end && i < historyList.length; i += 3 )
 	{
-		if (debugOn >= 6) { debugLog += " > " + historyList[i] + "," + historyList[i+1] + "," + historyList[i+2]; }
+		log( 6, " > " + historyList[i] + "," + historyList[i+1] + "," + historyList[i+2] );
 		markItem( historyList[i], historyList[i+1], historyList[i+2], "user" );
 	}
 }
@@ -258,7 +484,9 @@ function replayHistory ( end ) {
 function userHistory ( direction ) {
 	var historyIndex = historyList[0];
 
-	if (debugOn >= 6) { debugLog += " uH(" + direction + ") " + historyIndex + ":" + historyList.length; }
+	if (direction != 0 && !boardReady) { return } // Nothing to undo, redo or rotate without a board
+
+	log( 6, " uH(" + direction + ") " + historyIndex + ":" + historyList.length );
 
 	if (direction == 0) // Restart (clear all and start over)
 	{
@@ -268,8 +496,8 @@ function userHistory ( direction ) {
 	else if (direction == 999) // Hidden feature to toggle the rotation of the board and replay from the start
 	{
 		boardSettingsRotate = (boardSettingsRotate == 0) ? 1 : 0;
-		initGlobals(); drawBoard();
-		replayHistory( historyIndex ); // Only till current position, to prevent undo moves won't come back
+		rotateManual = boardSettingsRotate; rotateManualLandscape = updateOrientation(); // The user's choice stands until the screen is turned
+		redrawGame();
 	}
 	else if (direction < 0 && historyIndex > 1) // Undo (backward)
 	{
@@ -283,22 +511,68 @@ function userHistory ( direction ) {
 		historyList[0] = historyIndex + 3;
 	}
 
-	if (debugOn >= 1) { document.getElementById("debuglog").innerHTML = debugLog; }
+	saveGame();
+	updateScoreText();
+	keepScreenOn();
 }
 
 
-// First click/action requires doubletap confirmation, the second one executes the action
+// Debug logging: debugOn is the level (0 = off, 0 as level of a message = an error: always logged).
+//   log( level, text )          adds the text to the running line "Info: ..."
+//   log( level, text, slot )    replaces the latest message of that slot (the state of markItem, calcScore, ...)
+// Everything also goes to the console.
+function log ( level, text, slot ) {
+	if (debugOn < level) { return }
+
+	if (slot) { debugLines[slot] = text }
+	else      { debugLines.info = (debugLines.info + text).slice( -3000 ) } // Keeps the running line from growing without end
+
+	console.log( text );
+	showLog();
+}
+
+function logAppend ( level, text, slot ) { // Adds to the latest message of a slot
+	if (debugOn < level) { return }
+
+	debugLines[slot] = (debugLines[slot] || "") + text;
+	showLog();
+}
+
+// All debug messages in one <pre> under the board (a phone has no console)
+function showLog () {
+	var box = document.getElementById("debugLog");
+	var out = (debugLines.info != "") ? "Info:" + debugLines.info : "";
+	var k;
+
+	for ( k = 2; k <= 6; k++ ) { if (debugLines[k]) { out += (out == "" ? "" : "\n") + debugLines[k] } }
+
+	box.textContent   = out;
+	box.style.display = (out == "") ? "none" : "block";
+}
+
+
+// Keys 1 and 2: the first key press asks for confirmation, a second press of the same key within confirmSeconds executes the action.
+// A tap or another key cancels it (see userInput and userKeyInput).
 function confirmAction ( name ) {
-	if (startCounter > 0 && pendingAction == name) { startCounter = 0; pendingAction = ""; return true }
-	startCounter = 2; pendingAction = name;
+	var now = Date.now();
+
+	if (confirmName == name && now - confirmTime <= confirmSeconds * 1000) { confirmName = ""; return true }
+
+	confirmName = name; confirmTime = now;
 	return false;
 }
 
 
-// Variant 2, pink: geeft true als de volgende klik op het laatste cijfer onder de drempel zakt van een al gegeven bonus
+// The score as text as well, for screen readers (the board only shows it as a picture). Called after every action, not while playing back.
+function updateScoreText () {
+	document.getElementById("scoreText").textContent = "Score: " + calcScore();
+}
+
+
+// Variant 2, pink: returns true if the next click on the last digit drops below the awarded bonus threshold
 function pinkCycleLowersBonus ( group, index ) {
 	if (boardVariant != 2 || group != 9 || index < 3 || index >= board2Pink.length) { return false }
-	if (index != board2Pink[0] - 1 || board2Pink[index] == 0) { return false } // Alleen het laatst gezette cijfer kan wijzigen
+	if (index != board2Pink[0] - 1 || board2Pink[index] == 0) { return false } // Only the last digit value can be modified
 
 	var nextValue = (board2Pink[index] >= 6) ? 1 : board2Pink[index] + 1;
 	return boardBonus[ 36 + index ] == 1 && nextValue < pinkBonusThreshold[ index ];
@@ -319,7 +593,7 @@ function rewritePinkDigit ( index ) {
 	{
 		if (historyList[i] == 9 && historyList[i+1] == index)
 		{
-			// De eerste klik op dit veld is de plaatsing (alleen als de gebruiker het veld zelf heeft gezet), de rest zijn cijfer-wissels
+			// First click on this field places a value (if user activated), consecutive clicks change the value
 			if (!placed && userPlaced) { newList.push( 9, index, 1 ) }
 			placed = true;
 		} else
@@ -332,7 +606,7 @@ function rewritePinkDigit ( index ) {
 	historyList = [ 1 ];
 	for ( i = 0; i < newList.length; i += 3 )
 	{
-		// Bewaar alleen zetten die nog effect hebben (een gebruikte bonus kan namelijk zijn vervallen)
+		// Only save user actions that don't have a side effect (an awarded bonus could be discarded)
 		if (markItem( newList[i], newList[i+1], newList[i+2], "user" ) != "none") { addHistory( newList[i], newList[i+1], newList[i+2] ) }
 	}
 }
@@ -418,7 +692,7 @@ function calcScore () {
 	scoreTotal = 0;
     for (i=0; i<colorScoreTotal.length; i++) { scoreTotal += colorScoreTotal[i] }
 
-	if (debugOn >= 5) { document.getElementById("debuglog5").innerHTML = "5) calcScore() " + colorScoreTotal + " Swans " + bonusCounter + " TotalScore " + scoreTotal }
+	log( 5, "5) calcScore() " + colorScoreTotal + " Swans " + bonusCounter + " TotalScore " + scoreTotal, 5 );
 
 	return scoreTotal;
 }
@@ -427,10 +701,12 @@ function calcScore () {
 function markBonus ( group, value ) {
 	var ctx = myCanvas.getContext("2d");
 	var txt = "BONUS";
-	var x = (group == 5) ? 213 : ((group == 6) ? boardWidth-213 : boardWidth/2);
-	var y = (group == 5 || group == 6) ? 401 : 932;
+	var x = (group == 5) ? 250 : ((group == 6) ? boardWidth-250 : boardWidth/2);  // Horizontal pixel coordinate position of the bonus indicators
+	var y = (group == 5 || group == 6) ? 605 : 1355;                              // Vertical pixel coordinate position of the bonus indicators
 	
-	if (debugOn >= 4) { document.getElementById("debuglog4").innerHTML = "4) markBonus(G" + group + ",V" + value + ") " + bonusList; }
+	if (boardVariant == 2) { y = y + 8 }  // Vertical pixel coordinate spacing is slightly different on variant 2
+
+	log( 4, "4) markBonus(G" + group + ",V" + value + ") " + bonusList, 4 );
 
 	if (group > 0)
 	{
@@ -452,6 +728,8 @@ function markBonus ( group, value ) {
 
 			if (boardVariant == 1) { ctx.fillStyle = (group == 5) ? "#FFD966" : ((group == 6) ? "#2E75B6" : "black") }
 			if (boardVariant == 2) { ctx.fillStyle = (group == 5) ? "#A6A6A6" : ((group == 6) ? "#FFD966" : "black") }
+			if (boardVariant == 2 && colorVariant &&  group == 5) { ctx.fillStyle = "#FF8601" }
+
 			ctx.fillRect(x-100, y, 2*100, 31);
 			ctx.lineWidth = 2;
 			ctx.strokeStyle = "white";
@@ -463,10 +741,11 @@ function markBonus ( group, value ) {
 
 			if (boardVariant == 1) { ctx.fillStyle = (group == 5) ? "black"   : ((group == 6) ? "white"   : "white") }
 			if (boardVariant == 2) { ctx.fillStyle = (group == 5) ? "white"   : ((group == 6) ? "black"   : "white") }
+
 			ctx.font = fontSmall; ctx.fillText(txt, x, y+27); ctx.font = fontLarge;
 		}
 	}
-	if (debugOn >= 4) { document.getElementById("debuglog4").innerHTML += " > " + bonusList  }
+	logAppend( 4, " > " + bonusList, 4 );
 }
 
 
@@ -476,7 +755,7 @@ function addItem ( group, value, optout ) {
 
 	optout = (typeof optout === "undefined") ? "bonus" : "undo";
 
-	if (debugOn >= 3) { document.getElementById("debuglog3").innerHTML = "3) addItem(G" + group + ",V" + value + ",O" + optout + ")"; }
+	log( 3, "3) addItem(G" + group + ",V" + value + ",O" + optout + ")", 3 );
 
 	switch (group) {
 		case 1: // Round  
@@ -520,8 +799,7 @@ function addItem ( group, value, optout ) {
 			markBonus( group, value ); 
 		break;
 		default:
-			debugLog += " addItem(G" + group + ") error";
-			if (debugOn >= 1) { document.getElementById("debuglog").innerHTML = debugLog; }
+      log( 1, " addItem(G" + group + ") error" );
 		break;
 	}
 }
@@ -551,15 +829,15 @@ function markItem( group, index, value, source ) {
 			case 1: // Round
 				board = boardRound;
 				i = board[0];
-				x = 50+(i*150); y = 67;
+				x = 67+(i*216.5); y = 97;  // Pixel coordinates
 				if (i >= 1 && i <= 6 && i < board.length) { // Add check mark to specified item, only if empty and next in turn
 					if (board[i] == 0 && board[i-1] > 0) { marker = "check"; board[i] = 1; board[0]++ }
 				}
 			break;
 			case 2: // ReRoll
 				board = boardReRoll;
-				xO = (boardVariant == 2) ? 200-22 : 200; xD = (boardVariant == 2) ? 126 : 104.5; x = xO+(i*xD);
-				y  = (boardVariant == 2) ? 198-27 : 198;
+				xO = (boardVariant == 2) ? 282-29 : 282; xD = (boardVariant == 2) ? 181 : 151; x = xO+(i*xD);  // Pixel coordinates
+				y  = (boardVariant == 2) ? 295-37 : 295;                                                       // Pixel coordinates
 				if (i >= 1 && i < board.length) {       // Add circle mark to next available empty item
 					if (board[i] == 0 && i == board[0]) { marker = "circle"; board[i] = 1; board[0]++ }
 				} else if (i == 0) {                    // Add check mark to next available marked circle
@@ -570,9 +848,8 @@ function markItem( group, index, value, source ) {
 			break;
 			case 3: // ReTake 
 				board = boardReTake;
-				x = 200+(i*104.5); y = 267;
-				xO = (boardVariant == 2) ? 200-22 : 200; xD = (boardVariant == 2) ? 126 : 104.5; x = xO+(i*xD);
-				y  = (boardVariant == 2) ? 264+3 : 264;
+				xO = (boardVariant == 2) ? 282-29 : 282; xD = (boardVariant == 2) ? 181 : 151; x = xO+(i*xD);               // Pixel coordinates
+				y  = (boardVariant == 2) ? 375+20 : 375;                                                                    // Pixel coordinates
 				if (i >= 1 && i < board.length) { // Add circle mark to next available empty item
 					if (board[i] == 0 && i == board[0]) { marker = "circle"; board[i] = 1; board[0]++ }
 				} else if (i == 0) {                        // Add check mark to next available marked circle
@@ -583,8 +860,8 @@ function markItem( group, index, value, source ) {
 			break;
 			case 4: // PlusOne
 				board = boardPlusOne;
-				xO = (boardVariant == 2) ? 200-22 : 200; xD = (boardVariant == 2) ? 126 : 104.5; x = xO+(i*xD);
-				y  = (boardVariant == 2) ? 330+35 : 330;
+				xO = (boardVariant == 2) ? 282-29 : 282; xD = (boardVariant == 2) ? 181 : 151; x = xO+(i*xD);               // Pixel coordinates
+				y  = (boardVariant == 2) ? 487+50 : 487;                                                                    // Pixel coordinates
 				if (i >= 1 && i < board.length) { // Add circle mark to next available empty item
 					if (board[i] == 0 && i == board[0]) { marker = "circle"; board[i] = 1; board[0]++ }
 				} else if (i == 0) {                        // Add check mark to next available marked circle
@@ -597,11 +874,11 @@ function markItem( group, index, value, source ) {
 				if (boardVariant == 1)
 				{
 					board = board1Yellow;
-					x = ((((i-1)%4)+1)*87)-7; y = 443+((Math.floor((i-1)/4)+1)*88);
+					x = ((((i-1)%4)+1)*127)-20; y = 640+((Math.floor((i-1)/4)+1)*128);                                      // Pixel coordinates
 				} else if (boardVariant == 2)
 				{
 					board = board2Silver;
-					x = ((((i-1)%6)+1)*79)-15; y = 490+((Math.floor((i-1)/6)+1)*87);
+					x = ((((i-1)%6)+1)*114)-28; y = 705+((Math.floor((i-1)/6)+1)*127);                                      // Pixel coordinates
 				}
 				if (board[0] >= board.length) { // Color is already complete, mark as full to clear bonus action
 					marker = "full";
@@ -613,7 +890,7 @@ function markItem( group, index, value, source ) {
 				board = (boardVariant == 2) ? board2Yellow : board1Blue;
 				if (boardVariant == 1)
 				{
-					x = ((((i-1)%4)+1)*87)-7+520; y = 443+88+((Math.floor((i-1)/4)+1)*88);
+					x = ((((i-1)%4)+1)*127)-20+752; y = 640+128+((Math.floor((i-1)/4)+1)*128);                              // Pixel coordinates
 					if (board[0] >= board.length) { // Color is already complete, mark as full to clear bonus action
 						marker = "full";
 					} else if (i >= 2 && i <= 12 && i < board.length) { // Add check mark to specified item, only if empty
@@ -621,7 +898,7 @@ function markItem( group, index, value, source ) {
 					}
 				} else if (boardVariant == 2)
 				{
-					x = ((((i-1)%4)+1)*87)-7+520; y = 443+132+((Math.floor((i-1)/4)+1)*44);
+					x = ((((i-1)%4)+1)*126.5)-20+752; y = 640+193+((Math.floor((i-1)/4)+1)*63);                             // Pixel coordinates
 					if (i >= 1 && i < board.length) {
 						if (board[i] == 0) { marker = "circle"; board[i] = 1; x += 4; y -= 18 } // Add circle mark to specified item
 						else if (board[i] == 1) { marker = "check" ; board[i] = 2 } // Add check mark to item, only if circled
@@ -630,7 +907,7 @@ function markItem( group, index, value, source ) {
 			break;  
 			case 7: // v1 Green  | v2 Blue  
 				board = (boardVariant == 2) ? board2Blue : board1Green;
-				xO = 30; xD = (boardVariant == 2) ? 84-8 : 84; x = xO+(i*xD)+5; y = 1063;
+				xO = 40; xD = (boardVariant == 2) ? 121-11.5 : 121; x = xO+(i*xD)+5; y = 1537                               // Pixel coordinates
 				if (boardVariant == 1)
 				{
 					if (i >= 1 && i < board.length) {    // Add check mark to specified item, only if empty
@@ -659,7 +936,7 @@ function markItem( group, index, value, source ) {
 			break; 
 			case 8: // v1 Orange | v2 Green 
 				board = (boardVariant == 2) ? board2Green : board1Orange;
-				xO = (boardVariant == 2) ? 30+5 : 30; xD = (boardVariant == 2) ? 84-8 : 84; x = xO+(i*xD); y = 1220;
+				xO = (boardVariant == 2) ? 40+10 : 40; xD = (boardVariant == 2) ? 121-11.5 : 121; x = xO+(i*xD); y = 1762;  // Pixel coordinates
 				if (i >= 1 && i < board.length) {
 					if (board[i] == 0 && i == board[0])         // Add specified digit to specified item, only if empty and next in line
 					{
@@ -677,7 +954,7 @@ function markItem( group, index, value, source ) {
 			break;  
 			case 9: // v1 Purple | v2 Pink  
 				board = (boardVariant == 2) ? board2Pink : board1Purple;
-				xO = (boardVariant == 2) ? 30+5 : 30; xD = (boardVariant == 2) ? 84-8 : 84; x = xO+(i*xD); y = 1364;
+				xO = (boardVariant == 2) ? 40+10 : 40; xD = (boardVariant == 2) ? 121-11.5 : 121; x = xO+(i*xD); y = 1972;  // Pixel coordinates
 				if (i >= 1 && i < board.length) {
 					if (board[i] == 0 && i == board[0])         // Add specified digit to specified item, only if empty and next in line
 					{
@@ -698,26 +975,25 @@ function markItem( group, index, value, source ) {
 				}
 			break;
 			default:
-				debugLog += " markItem(G" + group + ") error";
-				if (debugOn >= 1) { document.getElementById("debuglog").innerHTML = debugLog; }
+        log( 1, " markItem(G" + group + ") error" );
 			break;
 		}
 	}
 
 	if (group == 9 && boardVariant == 2 && marker == "digit") { pinkPlacedBy[ board[0] - 1 ] = source } // Onthoud of dit pink-cijfer door de gebruiker of door een bonus is geplaatst
 
-	if (debugOn >= 2) { document.getElementById("debuglog2").innerHTML = "2) markItem(G" + group + ",I" + index + ",V" + value + "," + source + ") " + marker + " " + board; }
+	log( 2, "2) markItem(G" + group + ",I" + index + ",V" + value + "," + source + ") " + marker + " " + board, 2 );
 
 	// Display one of the marker types (check/circle/used/digit)
 	if (boardSettingsRotate != 0) { x -= boardWidth }
 	if (marker == "circle") {
-		ctx.beginPath(); ctx.arc(x,y,30,0,2*Math.PI); ctx.strokeStyle = "red"; ctx.lineWidth = 12; ctx.stroke();
+		ctx.beginPath(); ctx.arc(x,y,45,0,2*Math.PI); ctx.strokeStyle = "red"; ctx.lineWidth = 12; ctx.stroke(); // Pixel size of the circle radius
 	} else if (marker == "check" || marker == "used") {
 		if (marker == "used") { x -= 20; y+=25 }
 		ctx.fillStyle = "red";   ctx.fillText("X", x, y);
 	} else if (marker == "digit" || marker == "digit+") {
 		var xx = x; if (boardSettingsRotate != 0) { xx += boardWidth } // HTML bug? Needs separate var
-		ctx.drawImage( document.getElementById(CleverImage), xx-25, y-48, 65, 50, x-25, y-48, 65, 50 );
+		ctx.drawImage( document.getElementById(CleverImage), xx-25, y-48, 65, 50, x-25, y-48, 65, 50 );          // Pixel size related to the font size
 		ctx.fillStyle = "red";   if (value <= 9) { ctx.fillText(value, x+5, y) } else { ctx.fillText("1", x-10, y); ctx.fillText(value-10, x+15, y) }
 	} else if (marker == "full" ) {
 		// No action, only added to clear bonus action, which is done if any mark is placed
@@ -841,7 +1117,7 @@ function markItem( group, index, value, source ) {
 	// Calculate and display score
 	x = (boardWidth/2);	if (boardSettingsRotate != 0) { x -= boardWidth }
 	var xx = x;   if (boardSettingsRotate != 0) { xx += boardWidth } // HTML bug? Needs separate var
-	var yy = 390; if (boardVariant == 2) { yy += 13 }
+	var yy = 590; if (boardVariant == 2) { yy += 13 }                // Vertical coordinate of "Score: #"
 	ctx.drawImage( document.getElementById(CleverImage), xx-175, yy, 350, 50, x-175, yy, 350, 50 );
 	ctx.fillStyle = "red";   ctx.fillText("Score: " + calcScore(), x, yy+46);
 	
@@ -849,7 +1125,7 @@ function markItem( group, index, value, source ) {
 }
 
 
-// Dialog to start a new game: choose the board variant, or continue the current game
+// Dialog to start a new game: choose the board variant, incl alternative color (to use original dice for variant 2), or continue the current game
 var dialogMinScale = 0.6;    // Smallest dialog scale (screen pixels per board pixel): keeps the buttons at least 120 x 45 when the board is shown small. 0 = scale exactly with the board
 var dialogHooked   = false;  // True once the dialog follows window resizes
 
@@ -860,10 +1136,12 @@ function updateDialogScale () {
 	if (rect.width > 0) { document.getElementById("startDialog").style.setProperty( "--s", Math.max( rect.width / myCanvas.width, dialogMinScale ) ) }
 }
 
-function openStartDialog () {
+function openStartDialog ( notice ) { // notice: optional red line in the window
 	var dlg = document.getElementById("startDialog");
 
 	if (dlg.open) { return }
+
+	document.getElementById("startError").textContent = notice || "";
 
 	updateDialogScale();
 	if (!dialogHooked) { window.addEventListener( "resize", updateDialogScale ); dialogHooked = true }
@@ -877,7 +1155,13 @@ function closeStartDialog () {
 }
 
 // Start a new game with the selected variant (choosing a variant in the dialog is the confirmation)
-function startGame ( variant ) {
+function startGame ( variant, altColor ) {
+	boardVariant = variant;
+	colorVariant = altColor;
+	CleverImage  = "CleverImage" + boardVariant; if (boardVariant > 1 && colorVariant) { CleverImage += "a" }
+
+	if (!imageOk( CleverImage )) { document.getElementById("startError").textContent = imageMissingText( CleverImage ); return } // Stay in the window: this variant can't be shown
+
 	closeStartDialog();
 	boardVariant = variant;
 	userHistory( 0 );
@@ -888,14 +1172,16 @@ function userKeyInput( event ) {
 	var key  = (event.key || "").toLowerCase();
 	var ctrl = event.ctrlKey || event.metaKey;
 
-	if (debugOn >= 6) { debugLog += " '" + event.key + "'"; document.getElementById("debuglog").innerHTML = debugLog }
+	if (confirmName != "variant" + key) { confirmName = "" } // Any other key cancels a key action that waits for its second press
+
+	log( 6, " '" + event.key + "'" );
 
 	if (ctrl && key == "z" && !event.shiftKey) { event.preventDefault(); userHistory( -1 ) }                              // Ctrl+Z = Undo
 	else if (ctrl && (key == "y" || (key == "z" && event.shiftKey))) { event.preventDefault(); userHistory( +1 ) }        // Ctrl+Y / Ctrl+Shift+Z = Redo
 	else if (!ctrl && !event.altKey && !event.repeat) // Ingehouden toetsen herhalen niet, anders zou 1 of 2 het spel kunnen herstarten
 	{
-		if (key == "1") { if (confirmAction("variant1")) { boardVariant = 1; userHistory(0) } else { startCounter = 1 } } // 2x '1' = Start variant 1
-		if (key == "2") { if (confirmAction("variant2")) { boardVariant = 2; userHistory(0) } else { startCounter = 1 } } // 2x '2' = Start variant 2
+		if (key == "1" && confirmAction("variant1")) { boardVariant = 1; userHistory(0) } // 1 twice = Start variant 1
+		if (key == "2" && confirmAction("variant2")) { boardVariant = 2; userHistory(0) } // 2 twice = Start variant 2
 		if (key == "z") { debugZones = debugZones ? 0 : 1; updateZoneOverlay() }                                          // 'z' = Show/hide tap zones
 		if (key == "h" || key == "?") { openStartDialog() }                                                               // 'h'|'?' = New game window
 		if (key == "r") { userHistory( 999 ) }                                                                            // 'r'|'R' = Rotate
@@ -918,8 +1204,9 @@ function userKeyInput( event ) {
 //   strip: { rect: [x0, y0, x1, y1], origin: x, pitch: p }    rij gelijke vakken met breedte p; index = floor((x - origin) / p)
 //                                                             (index 0 = eerstvolgende vrije vak)
 // ==========================================================================================================
-var X_BUTTONS  = 135; // Rechterrand van de knoppenkolom linksboven (herstart, undo, redo)
-var Y_CONTROLS = 425; // Onderkant van de besturingsbalken bovenaan; daaronder beginnen de gekleurde borden
+var X_BUTTONS  = 190; // Pixel coordinate horizontal; Right edge of the game control button column for restart, undo, redo)
+var Y_CONTROLS = 600; // Pixel coordinate vertical; Bottom of the two or three horizontal control bars
+var R_SIZE     =  60; // Pixel coordinate size of the hidden rotate buttons in the corners of the board
 
 // count+1 grenzen op gelijke afstand: steps( 30, 90, 4 ) = [ 30, 120, 210, 300, 390 ]
 function steps ( start, pitch, count ) {
@@ -928,44 +1215,45 @@ function steps ( start, pitch, count ) {
 	return a;
 }
 
-var HITZONES = [
+var HITZONES = [                                                                                          // Pixel coordinates
 	// Hidden features and game control buttons (for all variants)
-	{ action: "variant", rect: [ -Infinity, boardHeight - 32, 33, Infinity ] },                  // LeftBottom: change variant (doubletap after gamestart)
-	{ action: "variant", rect: [ boardWidth - 32, boardHeight - 32, boardWidth, boardHeight ] }, // RightBottom: change variant (doubletap after gamestart)
-	{ action: "rotate",  rect: [ -Infinity, -Infinity, 33, 33 ] },                               // LeftTop corner: rotate board
-	{ action: "rotate",  rect: [ boardWidth - 32, -Infinity, boardWidth, 33 ] },                 // RightTop corner: rotate board
-	{ action: "restart", rect: [ -Infinity, -Infinity, X_BUTTONS, 130 ] },                       // Restart button: opens the new game window
-	{ action: "undo",    rect: [ -Infinity, 130, X_BUTTONS, 265 ] },
-	{ action: "redo",    rect: [ -Infinity, 265, X_BUTTONS, Y_CONTROLS ] },
+	{ action: "rotate",  rect: [ -Infinity, -Infinity, R_SIZE, R_SIZE ] },                                // LeftTop corner: rotate board
+	{ action: "rotate",  rect: [ boardWidth - R_SIZE, -Infinity, boardWidth, R_SIZE ] },                  // RightTop corner: rotate board
+	{ action: "rotate",  rect: [ -Infinity, boardHeight - R_SIZE, R_SIZE, boardHeight ] },                // LeftBottom corner: rotate board
+	{ action: "rotate",  rect: [ boardWidth - R_SIZE, boardHeight - R_SIZE, boardWidth, boardHeight ] },  // RightBottom corner: rotate board
+	{ action: "restart", rect: [ -Infinity, -Infinity, X_BUTTONS, 200 ] },                                // Restart button: opens the new game dialog
+	{ action: "undo",    rect: [ -Infinity, 200, X_BUTTONS, 400 ] },
+	{ action: "redo",    rect: [ -Infinity, 400, X_BUTTONS, Y_CONTROLS ] },
 
-	// Besturingsbalken bovenaan, rechts van de knoppen (index 0)
-	{ group: 1, index: 0, rect: [ X_BUTTONS, -Infinity, Infinity, 125 ] },               // Round,   all variants
-	{ group: 2, index: 0, variant: 1, rect: [ X_BUTTONS,  125, Infinity,  263 ] },       // ReRoll,  variant 1
-	{ group: 2, index: 0, variant: 2, rect: [ X_BUTTONS,  125, Infinity,  225 ] },       // ReRoll,  variant 2
-	{ group: 3, index: 0, variant: 2, rect: [ X_BUTTONS,  225, Infinity,  310 ] },       // ReTake,  variant 2 only
-	{ group: 4, index: 0, variant: 1, rect: [ X_BUTTONS,  263, Infinity, Y_CONTROLS ] }, // PlusOne, variant 1
-	{ group: 4, index: 0, variant: 2, rect: [ X_BUTTONS,  310, Infinity, Y_CONTROLS ] }, // PlusOne, variant 2
+	// Control bars horizontal top, to the right of the game control buttons (index 0)
+	{ group: 1, index: 0, rect: [ X_BUTTONS, -Infinity, Infinity, 190 ] },               // Round,   all variants
+	{ group: 2, index: 0, variant: 1, rect: [ X_BUTTONS,  190, Infinity,  390 ] },       // ReRoll,  variant 1
+	{ group: 2, index: 0, variant: 2, rect: [ X_BUTTONS,  190, Infinity,  325 ] },       // ReRoll,  variant 2
+	{ group: 3, index: 0, variant: 2, rect: [ X_BUTTONS,  325, Infinity,  465 ] },       // ReTake,  variant 2 only
+	{ group: 4, index: 0, variant: 1, rect: [ X_BUTTONS,  390, Infinity, Y_CONTROLS ] }, // PlusOne, variant 1
+	{ group: 4, index: 0, variant: 2, rect: [ X_BUTTONS,  465, Infinity, Y_CONTROLS ] }, // PlusOne, variant 2
+	
 	// Eerste bord (links): variant 1 geel, variant 2 zilver
-	{ group: 5, variant: 1, xs: steps( 30, 90, 4 ), ys: [ 470, 555, 645, 735, 825 ], first: 1 },
-	{ group: 5, variant: 2, xs: steps( 27, 79, 6 ), ys: steps( 513, 88, 4 ),         first: 1 },
+	{ group: 5, variant: 1, xs: steps(  50, 125, 4 ), ys: steps( 690, 125, 4 ), first: 1 },
+	{ group: 5, variant: 2, xs: steps(  27, 115, 6 ), ys: steps( 755, 125, 4 ), first: 1 },
 
 	// Tweede bord (rechts): variant 1 blauw, variant 2 geel
-	{ group: 6, variant: 1, xs: [ 560, 645, 735, 825, 915 ], ys: [ 555, 645, 735, 825 ], first: 1 },
-	{ group: 6, variant: 2, cells: [                                                     // Schuin verspringende vakjes
-		[ 645, 555, 735, 645,  2 ], [ 825, 555, 915, 645,  4 ],
-		[ 560, 600, 645, 690,  5 ], [ 735, 600, 825, 690,  7 ],
-		[ 645, 645, 735, 735, 10 ], [ 825, 645, 915, 735, 12 ],
-		[ 560, 690, 645, 780, 13 ], [ 735, 690, 825, 780, 15 ],
-		[ 645, 735, 735, 825, 18 ], [ 825, 735, 915, 825, 20 ] ] },
+	{ group: 6, variant: 1, xs: steps( 805, 125, 4 ), ys: steps( 815, 125, 3 ), first: 1 },
+	{ group: 6, variant: 2, cells: [                                        // Offset areas [ TopLftX, TopLftY, BotRgtX, BotRgtY, Bonus ]
+		[ 925,  815, 1050,  940,  2 ], [ 1175,  815, 1300,  945,  4 ],      //      6.02      6.04
+		[ 800,  880,  925, 1005,  5 ], [ 1050,  880, 1175, 1005,  7 ],      // 6.05      6.07
+		[ 925,  940, 1050, 1065, 10 ], [ 1175,  940, 1300, 1065, 12 ],      //      6.10      6.12
+		[ 800, 1005,  925, 1130, 13 ], [ 1050, 1005, 1175, 1130, 15 ],      // 6.13      6.15
+		[ 925, 1065, 1050, 1190, 18 ], [ 1175, 1065, 1300, 1190, 20 ] ] },  //      6.18      6.20
 
 	// Onderste rijen over de volle breedte: variant 1 groen/oranje/paars, variant 2 blauw/groen/roze
 	// Variant 2: de vakjes (68 px breed, 76 px uit elkaar) beginnen op x = 76*k + 8 (gemeten in Clever2.png); origin 4 zet elke zone dus midden op het vakje
-	{ group: 7, variant: 1, rect: [ -Infinity,  950, Infinity, 1135 ], index: 0 },
-	{ group: 7, variant: 2, rect: [ -Infinity,  950, Infinity, 1135 ], origin: 4, pitch: 76, value: 2 },
-	{ group: 8, variant: 1, rect: [ -Infinity, 1135, Infinity, 1285 ], origin: -4, pitch: 84, value: 1 },
-	{ group: 8, variant: 2, rect: [ -Infinity, 1135, Infinity, 1285 ], origin: 4, pitch: 76, value: 1 },
-	{ group: 9, variant: 1, rect: [ -Infinity, 1285, Infinity, Infinity ], origin: -4, pitch: 84, value: 6 },
-	{ group: 9, variant: 2, rect: [ -Infinity, 1285, Infinity, Infinity ], origin: 4, pitch: 76, value: 6 }
+	{ group: 7, variant: 1, rect: [ -Infinity, 1385, Infinity, 1650 ], index: 0 },
+	{ group: 7, variant: 2, rect: [ -Infinity, 1385, Infinity, 1650 ], origin: 0, pitch: 110, value: 2 },
+	{ group: 8, variant: 1, rect: [ -Infinity, 1650, Infinity, 1865 ], origin: -10, pitch: 121, value: 1 },
+	{ group: 8, variant: 2, rect: [ -Infinity, 1650, Infinity, 1865 ], origin: 0, pitch: 110, value: 1 },
+	{ group: 9, variant: 1, rect: [ -Infinity, 1865, Infinity, Infinity ], origin: -10, pitch: 121, value: 6 },
+	{ group: 9, variant: 2, rect: [ -Infinity, 1865, Infinity, Infinity ], origin: 0, pitch: 110, value: 6 }
 ];
 
 
@@ -1049,7 +1337,7 @@ function updateZoneOverlay () {
 	zoneOverlay.style.top     = (r.top  + window.pageYOffset) + "px";
 	zoneOverlay.style.width   = r.width  + "px";
 	zoneOverlay.style.height  = r.height + "px";
-	zoneOverlay.width         = myCanvas.width;  // Zelfde resolutie als het bord: 1 pixel hier is 1 pixel van de bordafbeelding
+	zoneOverlay.width         = myCanvas.width;   // Same resolution as the board itself: 1 pixel here is 1 pixel of the board image
 	zoneOverlay.height        = myCanvas.height;
 
 	var ctx   = zoneOverlay.getContext( "2d" );
@@ -1095,6 +1383,8 @@ function updateZoneOverlay () {
 
 
 function userInput( event ) {
+	if (!boardReady) { return } // No board to tap on
+
 	// Canvas is scaled by CSS: convert the click from screen- to board location
 	var rect = myCanvas.getBoundingClientRect();
 	if (rect.width == 0 || rect.height == 0) { return }
@@ -1104,7 +1394,6 @@ function userInput( event ) {
 	// Swap (x,y) board location in cased the board is rotated
 	var x = (boardSettingsRotate == 0) ? cx : boardWidth-cy;
 	var y = (boardSettingsRotate == 0) ? cy : cx;
-	var debugText = "X" + cx + " Y" + cy + " R" + boardSettingsRotate + " X" + x + " Y" + y;
 
 	// Reset board location before calculating the new one based on this input
 	var group = 0;
@@ -1114,49 +1403,47 @@ function userInput( event ) {
 	var hit = hitTest( x, y );
 	if (hit != null)
 	{
-		if      (hit.action == "variant") { if (historyList.length <= 1 || confirmAction("variant")) { boardVariant = (boardVariant == 1) ? 2 : 1; userHistory( 0 ) } } // Hidden feature to toggle board variant 1/2 (double confirm if the game started)
-		else if (hit.action == "rotate")  { userHistory( 999 ) }                                  // Hidden feature to toggle the rotation of the board
-		else if (hit.action == "restart") { openStartDialog() }                                    // Restart button: open the new game window
-		else if (hit.action == "undo")    { userHistory( -1 ) }
-		else if (hit.action == "redo")    { userHistory( +1 ) }
+		if      (hit.action == "rotate")  { userHistory( 999 ) }          // Hidden feature to toggle the rotation of the board
+		else if (hit.action == "restart") { openStartDialog() }           // Restart button: open the new game dialog
+		else if (hit.action == "undo")    { userHistory( -1 ) }           // Undo: go back one step in history
+		else if (hit.action == "redo")    { userHistory( +1 ) }           // Redo: go forward one step in history
 		else { group = hit.group; index = hit.index; value = hit.value }
 	}
 
-	if (startCounter > 0) { startCounter-- }
+	confirmName = ""; // A tap cancels a key action that waits for its second key press
 
-	if (debugOn >= 4) { debugText += " G" + group + " I" + index + " V" + value + " Sc" + startCounter; document.getElementById("debuglog4").innerHTML = debugText }
+	log( 4, "X" + cx + " Y" + cy + " R" + boardSettingsRotate + " X" + x + " Y" + y + " G" + group + " I" + index + " V" + value, 4 );
 
 	if (group > 0 && index >= 0)
 	{
 		if (pinkCycleLowersBonus( group, index )) { rewritePinkDigit( index ) } // Value drops below threshold: revoke bonus
 		else if (markItem( group, index, value, "user" ) != "none") { addHistory( group, index, value ) }
 	}
+
+	saveGame();
+	updateScoreText();
+	keepScreenOn();
 }
 
 
+})();
 </script>
 
-<p id="debuglog1"></p>
-<p id="debuglog2"></p>
-<p id="debuglog3"></p>
-<p id="debuglog4"></p>
-<p id="debuglog5"></p>
-<p id="debuglog6"></p>
-<p id="debuglog7"></p>
-<p id="debuglog"></p>
+<pre id="debugLog"></pre>
 
-<dialog id="startDialog" aria-labelledby="startTitle" onclick="if (event.target == this) { closeStartDialog() }" onclose="myCanvas.focus()">
+<dialog id="startDialog" aria-labelledby="startTitle">
 <div class="box">
   <h2 id="startTitle">New game</h2>
-  <button id="startVariant1" type="button" onclick="startGame( 1 )"><span class="main">Clever</span></button>
-  <button id="startVariant2" type="button" onclick="startGame( 2 )"><span class="sub">Twice as</span><span class="main">Clever</span></button>
-  <p class="or">or</p>
-  <button id="startContinue" type="button" onclick="closeStartDialog()" autofocus><span class="main">Continue</span><span class="sub">current game</span></button>
-  <p class="hint">Hint: Press &lsquo;R&rsquo; to rotate board</p>
+  <p id="startError" class="error"></p>
+  <button id="startVariant1" type="button"><span class="main">Clever</span></button>
+  <button id="startVariant2" type="button"><span class="sub">Twice as</span><span class="main">Clever</span></button>
+  <label class="altcolor">Alternative color<input id="colorVariant" type="checkbox"></label>
+  <button id="startContinue" type="button" autofocus><span class="main">Continue</span><span class="sub">current game</span></button>
+  <p class="hint">Hint: Press &lsquo;R&rsquo; to rotate</p>
 </div>
 </dialog>
 
-<address style="text-align: center;"> "Clever" by Wolfgang Warsch - 999 Games - HTML programming by Ric Zwanenberg (December 2020; v261101.7b)</address>
+<address style="text-align: center;"> "Clever" by Wolfgang Warsch - 999 Games - HTML programming by Ric Zwanenberg (December 2020; <span id="version"></span>)</address>
 
 </body>
 </html>
