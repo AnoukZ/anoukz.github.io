@@ -81,7 +81,7 @@
 <script>
 (function () { // Everything below lives inside this function: no global variables. The tests reach it through cleverEval (see ?test)
 
-var VERSION        = "v261107.9e";                     // Shown at the bottom of the page: change it here only
+var VERSION        = "v261108.9f";                     // Shown at the bottom of the page: change it here only
 
 var boardVariant   = 1;                                // Two Clever variants are available: 1 = Original, 2 = "Dobbel zo Clever"
 var colorVariant   = false;                            // False means real game colors, True means only use colors from the Original
@@ -119,7 +119,7 @@ var awakeMinutes   = 30;     // ...and let go again after this many minutes with
 var saveKey        = "cleverGame";
 var boardReady     = true;   // False while the board image is missing: the game can't be shown or played
 var screenLandscape       = false; // Orientation of the screen; a nearly square window keeps the previous orientation
-var rotateManual          = null;  // Rotation (0/1) chosen by the user with R or a corner; null = automatic. Lasts until the screen is turned
+var rotateManual          = null;  // null = automatic rotation; true/false = manual rotation selected by the user
 var rotateManualLandscape = false; // Orientation of the screen at the moment the user made that choice
 var wakeLock       = null;   // The screen wake lock, while we hold one
 var wakePending    = false;  // True while a wake lock request is on its way
@@ -334,7 +334,7 @@ window.onload = function() {
 		colorVariant = !!saved.color;
     	CleverImage  = "CleverImage" + boardVariant; if (boardVariant > 1 && colorVariant) { CleverImage += "a" }
 		historyList  = saved.history;
-		rotateManual = (saved.rotate === 0 || saved.rotate === 1) ? saved.rotate : null;
+		rotateManual = (typeof saved.rotate === "boolean") ? saved.rotate : null;
 		rotateManualLandscape = !!saved.landscape;
 		
 		log( 7, " Saved:" + CleverImage);
@@ -1179,7 +1179,6 @@ function startGame ( variant, altColor ) {
 	if (!imageOk( CleverImage )) { document.getElementById("startError").textContent = imageMissingText( CleverImage ); return } // Stay in the window: this variant can't be shown
 
 	closeStartDialog();
-	boardVariant = variant;
 	userHistory( 0 );
 }
 
@@ -1196,8 +1195,8 @@ function userKeyInput( event ) {
 	else if (ctrl && (key == "y" || (key == "z" && event.shiftKey))) { event.preventDefault(); userHistory( +1 ) }        // Ctrl+Y / Ctrl+Shift+Z = Redo
 	else if (!ctrl && !event.altKey && !event.repeat) // Ingehouden toetsen herhalen niet, anders zou 1 of 2 het spel kunnen herstarten
 	{
-		if (key == "1" && confirmAction("variant1")) { boardVariant = 1; userHistory( 0 ) }                               // 1 twice = Start variant 1
-		if (key == "2" && confirmAction("variant2")) { boardVariant = 2; userHistory( 0 ) }                               // 2 twice = Start variant 2
+		if (key == "1" && confirmAction("variant1")) { startGame( 1, false ) }                                            // 1 twice = Start variant 1
+		if (key == "2" && confirmAction("variant2")) { startGame( 2, document.getElementById("colorVariant").checked ) }  // 2 twice = Start variant 2
 		if (key == "z") { debugZones = !debugZones; updateZoneOverlay() }                                                 // 'z' = Show/hide tap zones
 		if (key == "h" || key == "?") { openStartDialog() }                                                               // 'h'|'?' = New game window
 		if (key == "r") { userHistory( 999 ) }                                                                            // 'r'|'R' = Rotate
@@ -1428,7 +1427,7 @@ function userInput( event ) {
 
 	confirmName = ""; // A tap cancels a key action that waits for its second key press
 
-	log( 4, "X" + cx + " Y" + cy + " R" + boardRotated ? 1 : 0 + " X" + x + " Y" + y + " G" + group + " I" + index + " V" + value, 4 );
+	log( 4, "X" + cx + " Y" + cy + " R" + (boardRotated ? 1 : 0) + " X" + x + " Y" + y + " G" + group + " I" + index + " V" + value, 4 );
 
 	if (group > 0 && index >= 0)
 	{
