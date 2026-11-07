@@ -915,7 +915,7 @@ function markItem( group, index, value, source ) {
 				{
 					x = ((((i-1)%4)+1)*126.5)-20+752; y = 655+193+((Math.floor((i-1)/4)+1)*63);                             // Pixel coordinates
 					if (i >= 1 && i < board.length) {
-						if (board[i] == 0) { marker = "circle"; board[i] = 1; x += 4; y -= 18 } // Add circle mark to specified item
+						if (board[i] == 0) { marker = "circle"; board[i] = 1; x += 4; y -= 32 } // Add circle mark to specified item (pixel coord)
 						else if (board[i] == 1) { marker = "check" ; board[i] = 2 } // Add check mark to item, only if circled
 					}
 				}
