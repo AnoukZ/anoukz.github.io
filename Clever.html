@@ -34,11 +34,13 @@
 		                      border: max(1px, calc(3px * var(--s))) solid #aaa; border-radius: calc(10px * var(--s)) }
 		dialog button .main { font-size: calc(32px * var(--s)); font-weight: bold; line-height: 1.1 }
 		dialog button .sub  { font-size: calc(20px * var(--s)); line-height: 1.1 }
+ 		@font-face 			{ font-family: 'myComicNeue'; src: url('ComicNeue-BoldItalic.woff2') format('woff2'); font-weight: bold; font-style: italic }
 	</style>
 </head>
 
 
 <body>
+
 
 <!-- Define create and display image canvas -->
 <img    id="CleverImage1"  width=   0 height=   0 src="Clever1.png"  alt="Clever1.png missing">
@@ -52,10 +54,7 @@
 
 <!------------------------------------------------------------>
 <!-- ToDo & Wishlist:                                       -->
-<!-- 2) bonus actions for v2 blue/green/pink                -->
-<!-- 3) undo bonus actions for pink if digit too low (done) -->
-<!--                                                        -->
-<!-- 7) instruction for usage (not game rules)              -->
+<!-- 7) minor instruction for usage and basic game rules    -->
 <!-- 8) use of defines in code for improved readability     -->
 <!------------------------------------------------------------>
 
@@ -82,6 +81,8 @@
 <script>
 (function () { // Everything below lives inside this function: no global variables. The tests reach it through cleverEval (see ?test)
 
+var VERSION        = "v261107.9e";                     // Shown at the bottom of the page: change it here only
+
 var boardVariant   = 1;                                // Two Clever variants are available: 1 = Original, 2 = "Dobbel zo Clever"
 var colorVariant   = false;                            // False means real game colors, True means only use colors from the Original
 var CleverImage    = "CleverImage" + boardVariant      // Select image depending on the board variant, after startDialog the colorVariant can be appended
@@ -89,35 +90,37 @@ var CleverImage    = "CleverImage" + boardVariant      // Select image depending
 var boardWidth     = myCanvas.width;                   // original horizontal resolution of the background image
 var boardHeight    = myCanvas.height;                  // original vertical   resolution of the background image
 
-var fontLarge      = "italic bold 60px Comic Sans MS"; // Font for digits (60px) and for socre (30px)
-var fontSmall      = "italic bold 30px Comic Sans MS"; // Font for digits (60px) and for socre (30px)
+var fontXLarge     = "italic bold 100px myComicNeue";  // Font for digits and check marks (100px)
+var fontLarge      = "italic bold  60px myComicNeue";  // Font for the main score indication (60px)
+var fontSmall      = "italic bold  30px myComicNeue";  // Font for bonus indication (30px)
 
-var boardSettingsRotate = 0;       // Board rotation (0: Portrait, 1: Landscape counterclockwise)
+var boardRotated   = false;                            // true = Portrait, false = Landscape (rotated counterclockwise)
 
-var VERSION        = "v261107.9d"; // Shown at the bottom of the page: change it here only
+var debugOn        = 0;                                // Activates all debug logging, 0: logging OFF, x: level 'x' logging ON (also: ?debug or ?debug=3 behind the URL)
+var debugLines     = { info: "" };                     // Debug messages, see log()
+var debugZones     = false;                            // true = draw all tap zones over the board (also: key Z, or ?zones behind the URL)
 
-var debugOn        = 0;            // Activates all debug logging, 0: logging OFF, x: level 'x' logging ON (also: ?debug or ?debug=3 behind the URL)
-var debugLines     = { info: "" }; // Debug messages, see log()
-var debugZones     = 0;            // 1: draw all tap zones over the board (also: key Z, or ?zones behind the URL)
 
 // Options behind the web address
-var urlOptions = (window.location && window.location.search) || "";
-var urlDebug   = /[?&]debug(?:=(\d+))?(?:&|$)/.exec( urlOptions );
-if (urlDebug) { debugOn = urlDebug[1] ? +urlDebug[1] : 7 }
-if (urlDebug || /[?&]test(?:&|$)/.test( urlOptions )) { window.cleverEval = function ( code ) { return eval( code ) } } // Hook for the tests in clever-tests: runs code inside this script
+var urlOptions     = (window.location && window.location.search) || "";
+var urlDebug       = /[?&]debug(?:=(\d+))?(?:&|$)/.exec( urlOptions );
+
+    if (urlDebug) { debugOn = urlDebug[1] ? +urlDebug[1] : 7 }
+    if (urlDebug || /[?&]test(?:&|$)/.test( urlOptions )) { window.cleverEval = function ( code ) { return eval( code ) } } // Hook for the tests in clever-tests: runs code inside this script
+
 
 // Behaviour switches
-var autoRotate     = 1;      // 1 = turn the board automatically on a landscape screen, 0 = only on request (R key or corner)
-var autoSave       = 1;      // 1 = keep the game in the browser and resume it after a reload, 0 = off (also: ?nosave behind the URL)
-var keepAwake      = 1;      // 1 = ask the browser to keep the screen on while playing (only where the browser supports it)
+var autoSave       = true;   // true = keep the game in the browser and resume it after a reload, false = off (also: ?nosave behind the URL)
+var autoRotate     = true;   // true = turn the board automatically on a landscape screen, false = only on request (R key or corner)
+var keepAwake      = true;   // true = ask the browser to keep the screen on while playing (only where the browser supports it)
 var awakeMinutes   = 30;     // ...and let go again after this many minutes without a tap, to spare the battery
 
 // State belonging to the switches above
+var saveKey        = "cleverGame";
 var boardReady     = true;   // False while the board image is missing: the game can't be shown or played
 var screenLandscape       = false; // Orientation of the screen; a nearly square window keeps the previous orientation
 var rotateManual          = null;  // Rotation (0/1) chosen by the user with R or a corner; null = automatic. Lasts until the screen is turned
 var rotateManualLandscape = false; // Orientation of the screen at the moment the user made that choice
-var saveKey        = "cleverGame";
 var wakeLock       = null;   // The screen wake lock, while we hold one
 var wakePending    = false;  // True while a wake lock request is on its way
 var wakeWanted     = false;  // True from the first tap until the screen has been idle for awakeMinutes
@@ -152,9 +155,9 @@ var boardBonus     = [];
 var bonusList      = []; // Used to set/clear manual bonus action on yellow/blue/black "x" and black "6"
 
 // Keys 1 and 2 start a new game only when pressed twice, to avoid starting by accident
-var confirmName    = "";   // The action that has been asked for and waits for its second key press
-var confirmTime    = 0;    // When that was (ms)
-var confirmSeconds = 2;    // Time allowed between the two key presses
+var confirmName    = ""; // The action that has been asked for and waits for its second key press
+var confirmTime    = 0;  // When that was (ms)
+var confirmSeconds = 2;  // Time allowed between the two key presses
 
 // Variant 2, pink: minimal dice value required to get the bonus of each field (index = field; bonus = boardBonus[36+veld])
 var pinkBonusThreshold = [ 0, 0, 0, 2, 3, 4, 5, 6, 2, 3, 4, 5, 6 ];
@@ -174,20 +177,20 @@ function updateOrientation () {
 	return screenLandscape; // Within 5% of a square the previous orientation stays, so a window doesn't flip back and forth
 }
 
-// Rotation (0/1) that the board should have now
+// Rotation (true/false) that the board should have now
 function wantedRotation () {
 	updateOrientation();
 
 	if (rotateManual != null && rotateManualLandscape == screenLandscape) { return rotateManual } // The user's choice stands...
 	rotateManual = null;                                                                          // ...until the screen is turned
 
-	return autoRotate ? (screenLandscape ? 1 : 0) : boardSettingsRotate;
+	return autoRotate ? screenLandscape : boardRotated;
 }
 
 function onScreenResize () {
 	var r = wantedRotation();
 
-	if (r != boardSettingsRotate) { boardSettingsRotate = r; redrawGame() }
+	if (r != boardRotated) { boardRotated = r; redrawGame() }
 }
 
 // Draw the board from scratch and play the game again until the current position
@@ -321,8 +324,8 @@ window.onload = function() {
 	       + " screen.availW:" + screen.availWidth + ",H:" + screen.availHeight   // minus taskbar
 	       + " screen.W:" + screen.width + ",H:" + screen.height );               // full physical screen
 
-	if (urlOptions.indexOf("zones")  >= 0) { debugZones = 1 }
-	if (urlOptions.indexOf("nosave") >= 0) { autoSave   = 0 }
+	if (urlOptions.indexOf("zones")  >= 0) { debugZones = true  }
+	if (urlOptions.indexOf("nosave") >= 0) { autoSave   = false }
 
 	var saved = loadGame();
 	if (saved)
@@ -340,9 +343,21 @@ window.onload = function() {
 	var notice = "";
 	if (!imageOk( CleverImage )) { notice = imageMissingText( CleverImage ) }
 
-	boardSettingsRotate = wantedRotation();
-	initGlobals(); drawBoard();
-	if (saved) { resumeGame() }
+	boardRotated = wantedRotation();
+	initGlobals();
+
+	document.fonts.load(fontXLarge).then(function(fonts)
+	{
+		console.log("Comic Neue loaded:", fonts.length > 0);
+	}).catch(function(error)
+	{
+		console.warn("Comic Neue could not be loaded:", error);
+	}).then(function()
+	{
+		drawBoard();
+		if (saved) { resumeGame() }
+	});
+	
 	if (notice != "") { openStartDialog( notice ) }
 
 	document.getElementById("version").textContent = VERSION;
@@ -427,7 +442,7 @@ function drawBoard () {
     // Scaling to the screen is done with CSS (see canvas rule in <style>); clicks are converted in userInput()
 
 	ctx.save();
-	if (boardSettingsRotate == 0)
+	if (!boardRotated)
 	{
 		myCanvas.width  = boardWidth;
 		myCanvas.height = boardHeight;
@@ -446,7 +461,7 @@ function drawBoard () {
 
 	updateZoneOverlay();
 
-	ctx.font      = fontLarge;
+	ctx.font      = fontXLarge;
 	ctx.fillStyle = "red";
 	ctx.textAlign = "center";
 
@@ -495,8 +510,8 @@ function userHistory ( direction ) {
 	}
 	else if (direction == 999) // Hidden feature to toggle the rotation of the board and replay from the start
 	{
-		boardSettingsRotate = (boardSettingsRotate == 0) ? 1 : 0;
-		rotateManual = boardSettingsRotate; rotateManualLandscape = updateOrientation(); // The user's choice stands until the screen is turned
+		boardRotated = !boardRotated;
+		rotateManual = boardRotated; rotateManualLandscape = updateOrientation(); // The user's choice stands until the screen is turned
 		redrawGame();
 	}
 	else if (direction < 0 && historyIndex > 1) // Undo (backward)
@@ -710,7 +725,7 @@ function markBonus ( group, value ) {
 
 	if (group > 0)
 	{
-		if (boardSettingsRotate != 0) { x -= boardWidth }
+		if (boardRotated) { x -= boardWidth }
 
 		if (value == 0 && bonusList[group] > 0) // Clear bonus action indicator and remove action message, if group bonus list empty
 		{
@@ -718,7 +733,7 @@ function markBonus ( group, value ) {
 			
 			if (bonusList[group] == 0)
 			{
-				var xx = x; if (boardSettingsRotate != 0) { xx += boardWidth } // HTML bug? Needs separate var
+				var xx = x; if (boardRotated) { xx += boardWidth } // HTML bug? Needs separate var
 				ctx.drawImage( document.getElementById(CleverImage), xx-100, y, 2*100, 31, x-100, y, 2*100, 31 );
 			}
 		}
@@ -742,7 +757,7 @@ function markBonus ( group, value ) {
 			if (boardVariant == 1) { ctx.fillStyle = (group == 5) ? "black"   : ((group == 6) ? "white"   : "white") }
 			if (boardVariant == 2) { ctx.fillStyle = (group == 5) ? "white"   : ((group == 6) ? "black"   : "white") }
 
-			ctx.font = fontSmall; ctx.fillText(txt, x, y+27); ctx.font = fontLarge;
+			ctx.font = fontSmall; ctx.fillText(txt, x, y+27); ctx.font = fontXLarge;
 		}
 	}
 	logAppend( 4, " > " + bonusList, 4 );
@@ -829,44 +844,44 @@ function markItem( group, index, value, source ) {
 			case 1: // Round
 				board = boardRound;
 				i = board[0];
-				x = 67+(i*216.5); y = 97;  // Pixel coordinates
+				x = 67+(i*216.5); y = 111;																		// Pixel coordinates
 				if (i >= 1 && i <= 6 && i < board.length) { // Add check mark to specified item, only if empty and next in turn
 					if (board[i] == 0 && board[i-1] > 0) { marker = "check"; board[i] = 1; board[0]++ }
 				}
 			break;
 			case 2: // ReRoll
 				board = boardReRoll;
-				xO = (boardVariant == 2) ? 282-29 : 282; xD = (boardVariant == 2) ? 181 : 151; x = xO+(i*xD);  // Pixel coordinates
-				y  = (boardVariant == 2) ? 295-37 : 295;                                                       // Pixel coordinates
+				xO = (boardVariant == 2) ? 282-29 : 282; xD = (boardVariant == 2) ? 181 : 151; x = xO+(i*xD);	// Pixel coordinates
+				y  = (boardVariant == 2) ? 295-37 : 295;														// Pixel coordinates
 				if (i >= 1 && i < board.length) {       // Add circle mark to next available empty item
 					if (board[i] == 0 && i == board[0]) { marker = "circle"; board[i] = 1; board[0]++ }
 				} else if (i == 0) {                    // Add check mark to next available marked circle
 					for ( i = 1 ; i < board.length && marker != "used"; i++ ) {
-						if (board[i] == 1) { marker = "used"; board[i] = 2;	x = xO+(i*xD)+16; y -= 4 }
+						if (board[i] == 1) { marker = "used"; board[i] = 2;	x = xO+(i*xD)+16; y += 9 }			// Pixel coordinates of the X
 					}
 				}
 			break;
 			case 3: // ReTake 
 				board = boardReTake;
-				xO = (boardVariant == 2) ? 282-29 : 282; xD = (boardVariant == 2) ? 181 : 151; x = xO+(i*xD);               // Pixel coordinates
-				y  = (boardVariant == 2) ? 375+20 : 375;                                                                    // Pixel coordinates
+				xO = (boardVariant == 2) ? 282-29 : 282; xD = (boardVariant == 2) ? 181 : 151; x = xO+(i*xD);	// Pixel coordinates
+				y  = (boardVariant == 2) ? 375+20 : 375;														// Pixel coordinates
 				if (i >= 1 && i < board.length) { // Add circle mark to next available empty item
 					if (board[i] == 0 && i == board[0]) { marker = "circle"; board[i] = 1; board[0]++ }
 				} else if (i == 0) {                        // Add check mark to next available marked circle
 					for ( i = 1 ; i < board.length && marker != "used"; i++ ) {
-						if (board[i] == 1) { marker = "used"; board[i] = 2;	x = xO+(i*xD)+16; y -= 4 }
+						if (board[i] == 1) { marker = "used"; board[i] = 2;	x = xO+(i*xD)+16; y += 9 }			// Pixel coordinates of the X
 					}
 				}
 			break;
 			case 4: // PlusOne
 				board = boardPlusOne;
-				xO = (boardVariant == 2) ? 282-29 : 282; xD = (boardVariant == 2) ? 181 : 151; x = xO+(i*xD);               // Pixel coordinates
-				y  = (boardVariant == 2) ? 487+50 : 487;                                                                    // Pixel coordinates
+				xO = (boardVariant == 2) ? 282-29 : 282; xD = (boardVariant == 2) ? 181 : 151; x = xO+(i*xD);	// Pixel coordinates
+				y  = (boardVariant == 2) ? 487+50 : 487;														// Pixel coordinates
 				if (i >= 1 && i < board.length) { // Add circle mark to next available empty item
 					if (board[i] == 0 && i == board[0]) { marker = "circle"; board[i] = 1; board[0]++ }
 				} else if (i == 0) {                        // Add check mark to next available marked circle
 					for ( i = 1 ; i < board.length && marker != "used"; i++ ) {
-						if (board[i] == 1) { marker = "used"; board[i] = 2;	x = xO+(i*xD)+16; y -= 4 }
+						if (board[i] == 1) { marker = "used"; board[i] = 2;	x = xO+(i*xD)+16; y += 9 }			// Pixel coordinates of the X
 					}
 				}
 			break;
@@ -874,11 +889,11 @@ function markItem( group, index, value, source ) {
 				if (boardVariant == 1)
 				{
 					board = board1Yellow;
-					x = ((((i-1)%4)+1)*127)-20; y = 640+((Math.floor((i-1)/4)+1)*128);                                      // Pixel coordinates
+					x = ((((i-1)%4)+1)*127)-20; y = 655+((Math.floor((i-1)/4)+1)*128);                                      // Pixel coordinates
 				} else if (boardVariant == 2)
 				{
 					board = board2Silver;
-					x = ((((i-1)%6)+1)*114)-28; y = 705+((Math.floor((i-1)/6)+1)*127);                                      // Pixel coordinates
+					x = ((((i-1)%6)+1)*114)-28; y = 720+((Math.floor((i-1)/6)+1)*127);                                      // Pixel coordinates
 				}
 				if (board[0] >= board.length) { // Color is already complete, mark as full to clear bonus action
 					marker = "full";
@@ -890,7 +905,7 @@ function markItem( group, index, value, source ) {
 				board = (boardVariant == 2) ? board2Yellow : board1Blue;
 				if (boardVariant == 1)
 				{
-					x = ((((i-1)%4)+1)*127)-20+752; y = 640+128+((Math.floor((i-1)/4)+1)*128);                              // Pixel coordinates
+					x = ((((i-1)%4)+1)*127)-20+752; y = 655+128+((Math.floor((i-1)/4)+1)*128);                              // Pixel coordinates
 					if (board[0] >= board.length) { // Color is already complete, mark as full to clear bonus action
 						marker = "full";
 					} else if (i >= 2 && i <= 12 && i < board.length) { // Add check mark to specified item, only if empty
@@ -898,7 +913,7 @@ function markItem( group, index, value, source ) {
 					}
 				} else if (boardVariant == 2)
 				{
-					x = ((((i-1)%4)+1)*126.5)-20+752; y = 640+193+((Math.floor((i-1)/4)+1)*63);                             // Pixel coordinates
+					x = ((((i-1)%4)+1)*126.5)-20+752; y = 655+193+((Math.floor((i-1)/4)+1)*63);                             // Pixel coordinates
 					if (i >= 1 && i < board.length) {
 						if (board[i] == 0) { marker = "circle"; board[i] = 1; x += 4; y -= 18 } // Add circle mark to specified item
 						else if (board[i] == 1) { marker = "check" ; board[i] = 2 } // Add check mark to item, only if circled
@@ -907,7 +922,7 @@ function markItem( group, index, value, source ) {
 			break;  
 			case 7: // v1 Green  | v2 Blue  
 				board = (boardVariant == 2) ? board2Blue : board1Green;
-				xO = 40; xD = (boardVariant == 2) ? 121-11.5 : 121; x = xO+(i*xD)+5; y = 1537                               // Pixel coordinates
+				xO = 40; xD = (boardVariant == 2) ? 121-11.5 : 121; x = xO+(i*xD)+5; y = 1550                               // Pixel coordinates
 				if (boardVariant == 1)
 				{
 					if (i >= 1 && i < board.length) {    // Add check mark to specified item, only if empty
@@ -936,7 +951,7 @@ function markItem( group, index, value, source ) {
 			break; 
 			case 8: // v1 Orange | v2 Green 
 				board = (boardVariant == 2) ? board2Green : board1Orange;
-				xO = (boardVariant == 2) ? 40+10 : 40; xD = (boardVariant == 2) ? 121-11.5 : 121; x = xO+(i*xD); y = 1762;  // Pixel coordinates
+				xO = (boardVariant == 2) ? 40+10 : 40; xD = (boardVariant == 2) ? 121-11.5 : 121; x = xO+(i*xD); y = 1775;  // Pixel coordinates
 				if (i >= 1 && i < board.length) {
 					if (board[i] == 0 && i == board[0])         // Add specified digit to specified item, only if empty and next in line
 					{
@@ -954,7 +969,7 @@ function markItem( group, index, value, source ) {
 			break;  
 			case 9: // v1 Purple | v2 Pink  
 				board = (boardVariant == 2) ? board2Pink : board1Purple;
-				xO = (boardVariant == 2) ? 40+10 : 40; xD = (boardVariant == 2) ? 121-11.5 : 121; x = xO+(i*xD); y = 1972;  // Pixel coordinates
+				xO = (boardVariant == 2) ? 40+10 : 40; xD = (boardVariant == 2) ? 121-11.5 : 121; x = xO+(i*xD); y = 1982;  // Pixel coordinates
 				if (i >= 1 && i < board.length) {
 					if (board[i] == 0 && i == board[0])         // Add specified digit to specified item, only if empty and next in line
 					{
@@ -985,15 +1000,16 @@ function markItem( group, index, value, source ) {
 	log( 2, "2) markItem(G" + group + ",I" + index + ",V" + value + "," + source + ") " + marker + " " + board, 2 );
 
 	// Display one of the marker types (check/circle/used/digit)
-	if (boardSettingsRotate != 0) { x -= boardWidth }
+	if (boardRotated) { x -= boardWidth }
 	if (marker == "circle") {
 		ctx.beginPath(); ctx.arc(x,y,45,0,2*Math.PI); ctx.strokeStyle = "red"; ctx.lineWidth = 12; ctx.stroke(); // Pixel size of the circle radius
 	} else if (marker == "check" || marker == "used") {
 		if (marker == "used") { x -= 20; y+=25 }
 		ctx.fillStyle = "red";   ctx.fillText("X", x, y);
 	} else if (marker == "digit" || marker == "digit+") {
-		var xx = x; if (boardSettingsRotate != 0) { xx += boardWidth } // HTML bug? Needs separate var
-		ctx.drawImage( document.getElementById(CleverImage), xx-25, y-48, 65, 50, x-25, y-48, 65, 50 );          // Pixel size related to the font size
+		var xx = x; if (boardRotated) { xx += boardWidth } // HTML bug? Needs separate var
+	
+		ctx.drawImage( document.getElementById(CleverImage), xx-30, y-75, 75, 85, x-30, y-75, 75, 85 );          // Pixel size related to the font size
 		ctx.fillStyle = "red";   if (value <= 9) { ctx.fillText(value, x+5, y) } else { ctx.fillText("1", x-10, y); ctx.fillText(value-10, x+15, y) }
 	} else if (marker == "full" ) {
 		// No action, only added to clear bonus action, which is done if any mark is placed
@@ -1115,11 +1131,11 @@ function markItem( group, index, value, source ) {
 	}
 
 	// Calculate and display score
-	x = (boardWidth/2);	if (boardSettingsRotate != 0) { x -= boardWidth }
-	var xx = x;   if (boardSettingsRotate != 0) { xx += boardWidth } // HTML bug? Needs separate var
-	var yy = 590; if (boardVariant == 2) { yy += 13 }                // Vertical coordinate of "Score: #"
+	x = (boardWidth/2);	if (boardRotated) { x -= boardWidth }
+	var xx = x;         if (boardRotated) { xx += boardWidth } // HTML bug? Needs separate var
+	var yy = 590;       if (boardVariant == 2) { yy += 13 }                // Vertical coordinate of "Score: #"
 	ctx.drawImage( document.getElementById(CleverImage), xx-175, yy, 350, 50, x-175, yy, 350, 50 );
-	ctx.fillStyle = "red";   ctx.fillText("Score: " + calcScore(), x, yy+46);
+	ctx.fillStyle = "red"; ctx.font = fontLarge; ctx.fillText("Score: " + calcScore(), x, yy+46); ctx.font = fontXLarge;
 	
 	return marker;
 }
@@ -1180,9 +1196,9 @@ function userKeyInput( event ) {
 	else if (ctrl && (key == "y" || (key == "z" && event.shiftKey))) { event.preventDefault(); userHistory( +1 ) }        // Ctrl+Y / Ctrl+Shift+Z = Redo
 	else if (!ctrl && !event.altKey && !event.repeat) // Ingehouden toetsen herhalen niet, anders zou 1 of 2 het spel kunnen herstarten
 	{
-		if (key == "1" && confirmAction("variant1")) { boardVariant = 1; userHistory(0) } // 1 twice = Start variant 1
-		if (key == "2" && confirmAction("variant2")) { boardVariant = 2; userHistory(0) } // 2 twice = Start variant 2
-		if (key == "z") { debugZones = debugZones ? 0 : 1; updateZoneOverlay() }                                          // 'z' = Show/hide tap zones
+		if (key == "1" && confirmAction("variant1")) { boardVariant = 1; userHistory( 0 ) }                               // 1 twice = Start variant 1
+		if (key == "2" && confirmAction("variant2")) { boardVariant = 2; userHistory( 0 ) }                               // 2 twice = Start variant 2
+		if (key == "z") { debugZones = !debugZones; updateZoneOverlay() }                                                 // 'z' = Show/hide tap zones
 		if (key == "h" || key == "?") { openStartDialog() }                                                               // 'h'|'?' = New game window
 		if (key == "r") { userHistory( 999 ) }                                                                            // 'r'|'R' = Rotate
 	}
@@ -1193,7 +1209,7 @@ function userKeyInput( event ) {
 // Waar op de bordafbeelding zit welk vakje? Dit is de enige plek waar die posities staan.
 // De coordinaten zijn pixels van de bordafbeelding (1020 x 1420), dus onafhankelijk van schaal en rotatie:
 // userInput() rekent een tik eerst om naar die pixels en zoekt dan met hitTest() het vakje op.
-// Hulpmodus: toets Z, of ?zones achter de URL, of debugZones = 1 tekent alle zones over het bord.
+// Hulpmodus: toets Z, of ?zones achter de URL, of debugZones = true tekent alle zones over het bord.
 //
 // Een zone bestaat uit [x0, y0, x1, y1] (x0 <= x < x1 en y0 <= y < y1) en een "action" of een "group" (+ "index" en "value").
 // De zones worden op volgorde doorzocht, de eerste die past wint. Met "variant: 1" of "variant: 2" geldt een zone maar voor een variant.
@@ -1344,7 +1360,7 @@ function updateZoneOverlay () {
 	var cells = hitCellsFor( boardVariant );
 	var i, c, x0, y0, x1, y1, hue, label, tw, tx, ty;
 
-	if (boardSettingsRotate != 0) { ctx.setTransform( 0, -1, 1, 0, 0, boardWidth ) } // Same rotation as the board
+	if (boardRotated) { ctx.setTransform( 0, -1, 1, 0, 0, boardWidth ) } // Same rotation as the board
 
 	ctx.font         = "bold 22px sans-serif";
 	ctx.textAlign    = "center";
@@ -1392,8 +1408,8 @@ function userInput( event ) {
 	var cy = Math.floor( (event.clientY - rect.top ) * myCanvas.height / rect.height );
 
 	// Swap (x,y) board location in cased the board is rotated
-	var x = (boardSettingsRotate == 0) ? cx : boardWidth-cy;
-	var y = (boardSettingsRotate == 0) ? cy : cx;
+	var x = boardRotated ? boardWidth-cy : cx;
+	var y = boardRotated ? cx : cy;
 
 	// Reset board location before calculating the new one based on this input
 	var group = 0;
@@ -1412,7 +1428,7 @@ function userInput( event ) {
 
 	confirmName = ""; // A tap cancels a key action that waits for its second key press
 
-	log( 4, "X" + cx + " Y" + cy + " R" + boardSettingsRotate + " X" + x + " Y" + y + " G" + group + " I" + index + " V" + value, 4 );
+	log( 4, "X" + cx + " Y" + cy + " R" + boardRotated ? 1 : 0 + " X" + x + " Y" + y + " G" + group + " I" + index + " V" + value, 4 );
 
 	if (group > 0 && index >= 0)
 	{
