@@ -937,7 +937,7 @@ function markItem( group, index, value, source ) {
 						if (board[i] == 0 && i == board[0])         // Add specified digit to specified item, only if empty and next in line
 						{
 							marker = "digit" ; board[i] = value; board[0]++;
-						} else if (board[i] > 0 && i == board[0]-1) // Change digit (cycle 1 thru 6), only for last marked item
+						} else if (board[i] > 0 && i == board[0]-1) // Change digit (cycle 1 thru 12), only for last marked item
 						{
 							if (i == 1) { value = (board[i] >= 12)         ? 2 : board[i]+1 }
 							else        { value = (board[i] >= board[i-1]) ? 2 : board[i]+1 }
@@ -1001,16 +1001,20 @@ function markItem( group, index, value, source ) {
 
 	// Display one of the marker types (check/circle/used/digit)
 	if (boardRotated) { x -= boardWidth }
+
 	if (marker == "circle") {
 		ctx.beginPath(); ctx.arc(x,y,45,0,2*Math.PI); ctx.strokeStyle = "red"; ctx.lineWidth = 12; ctx.stroke(); // Pixel size of the circle radius
+
 	} else if (marker == "check" || marker == "used") {
 		if (marker == "used") { x -= 20; y+=25 }
 		ctx.fillStyle = "red";   ctx.fillText("X", x, y);
+
 	} else if (marker == "digit" || marker == "digit+") {
 		var xx = x; if (boardRotated) { xx += boardWidth } // HTML bug? Needs separate var
 	
-		ctx.drawImage( document.getElementById(CleverImage), xx-30, y-75, 75, 85, x-30, y-75, 75, 85 );          // Pixel size related to the font size
-		ctx.fillStyle = "red";   if (value <= 9) { ctx.fillText(value, x+5, y) } else { ctx.fillText("1", x-10, y); ctx.fillText(value-10, x+15, y) }
+		ctx.drawImage( document.getElementById(CleverImage), xx-35, y-75, 90, 85, x-35, y-75, 90, 85 );          // Pixel size related to the font size
+		ctx.fillStyle = "red";   if (value <= 9) { ctx.fillText(value, x+5, y) } else { ctx.fillText("1", x-10, y); ctx.fillText(value-10, x+25, y) }
+
 	} else if (marker == "full" ) {
 		// No action, only added to clear bonus action, which is done if any mark is placed
 	}
